@@ -1,0 +1,144 @@
+log_feeding:
+  name: Log feeding
+  description: Record a feeding for a child.
+  fields:
+    child_id:
+      name: Child ID
+      description: Numeric ID of the child (visible in BabyTracker URL or via the API).
+      required: true
+      example: 1
+      selector:
+        number: { mode: box, min: 1 }
+    type:
+      name: Type
+      description: What was fed.
+      required: true
+      selector:
+        select:
+          options:
+            - "breast milk"
+            - "formula"
+            - "fortified breast milk"
+            - "solid food"
+    method:
+      name: Method
+      description: How it was fed.
+      required: true
+      selector:
+        select:
+          options:
+            - "bottle"
+            - "left breast"
+            - "right breast"
+            - "both breasts"
+            - "parent fed"
+            - "self fed"
+    amount:
+      name: Amount (mL)
+      description: Volume fed in mL (omit if not measured).
+      example: 120
+      selector:
+        number: { mode: box, min: 0, step: 1 }
+    duration_minutes:
+      name: Duration (minutes)
+      description: Total feeding duration. Defaults to a 0-minute interval at "now".
+      example: 15
+      selector:
+        number: { mode: box, min: 0, step: 1 }
+    notes:
+      name: Notes
+      example: "Took it well"
+      selector: { text: }
+
+log_sleep:
+  name: Log sleep
+  description: Record a sleep period for a child.
+  fields:
+    child_id:
+      name: Child ID
+      required: true
+      selector: { number: { mode: box, min: 1 } }
+    duration_minutes:
+      name: Duration (minutes)
+      description: How long the sleep lasted, ending now.
+      required: true
+      example: 90
+      selector: { number: { mode: box, min: 1, step: 1 } }
+    nap:
+      name: Nap
+      description: Whether this was a nap (vs. nighttime sleep).
+      default: true
+      selector: { boolean: }
+    notes:
+      name: Notes
+      selector: { text: }
+
+log_diaper:
+  name: Log diaper change
+  description: Record a diaper change.
+  fields:
+    child_id:
+      name: Child ID
+      required: true
+      selector: { number: { mode: box, min: 1 } }
+    wet:
+      name: Wet
+      default: false
+      selector: { boolean: }
+    solid:
+      name: Solid
+      default: false
+      selector: { boolean: }
+    color:
+      name: Color
+      description: Optional color of the stool.
+      selector:
+        select:
+          options:
+            - ""
+            - "black"
+            - "brown"
+            - "green"
+            - "yellow"
+    notes:
+      name: Notes
+      selector: { text: }
+
+start_timer:
+  name: Start timer
+  description: Start a timer for a child (e.g. Feeding, Sleep, Tummy Time).
+  fields:
+    child_id:
+      name: Child ID
+      required: true
+      selector: { number: { mode: box, min: 1 } }
+    name:
+      name: Timer name
+      description: Used to identify the timer (matches the activity it tracks).
+      required: true
+      example: "Sleep"
+      selector: { text: }
+
+stop_timer:
+  name: Stop timer
+  description: Stop / cancel a running timer by ID.
+  fields:
+    timer_id:
+      name: Timer ID
+      description: Numeric ID from the babytracker_timer_started event.
+      required: true
+      selector: { number: { mode: box, min: 1 } }
+
+set_slideshow:
+  name: Picture frame slideshow
+  description: Start or stop the slideshow on a connected display.
+  fields:
+    enabled:
+      name: Enabled
+      required: true
+      selector: { boolean: }
+    device:
+      name: Device name
+      description: Optional. If omitted, targets all connected displays.
+      example: "nursery-tablet"
+      selector: { text: }
