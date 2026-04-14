@@ -15,7 +15,9 @@ from .const import (
     DOMAIN,
     EVENT_NEW_DIAPER,
     EVENT_NEW_FEEDING,
+    EVENT_NEW_MEDICATION,
     EVENT_NEW_SLEEP,
+    EVENT_NEW_TEMPERATURE,
     EVENT_TIMER_STARTED,
     EVENT_TIMER_STOPPED,
 )
@@ -31,10 +33,14 @@ class ChildSnapshot:
     last_feeding: dict | None = None
     last_sleep: dict | None = None
     last_diaper: dict | None = None
+    last_temperature: dict | None = None
+    last_medication: dict | None = None
     feedings_today: int = 0
     feeding_volume_today: float = 0.0
     sleep_minutes_today: int = 0
     diapers_today: int = 0
+    diapers_wet_today: int = 0
+    diapers_solid_today: int = 0
     active_timer: dict | None = None
 
 
@@ -102,11 +108,15 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 feedings = await self.client.list_feedings(cid, limit=100)
                 sleeps = await self.client.list_sleep(cid, limit=100)
                 changes = await self.client.list_changes(cid, limit=100)
+                temps = await self.client.list_temperature(cid, limit=1)
+                meds = await self.client.list_medications(cid, limit=1)
 
                 snap = ChildSnapshot(child=child)
                 snap.last_feeding = feedings[0] if feedings else None
                 snap.last_sleep = sleeps[0] if sleeps else None
                 snap.last_diaper = changes[0] if changes else None
+                snap.last_temperature = temps[0] if temps else None
+                snap.last_medication = meds[0] if meds else None
 
                 for f in feedings:
                     start = _parse_iso(f.get("start"))
@@ -123,6 +133,10 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                     t = _parse_iso(d.get("time"))
                     if t and t >= today_start:
                         snap.diapers_today += 1
+                        if d.get("wet"):
+                            snap.diapers_wet_today += 1
+                        if d.get("solid"):
+                            snap.diapers_solid_today += 1
 
                 # First running timer for this child (most setups have ≤1 at a time)
                 snap.active_timer = next((t for t in timers if t.get("child") == cid), None)
@@ -134,6 +148,8 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 self._emit_new_entries(cid, child, "feeding", feedings, EVENT_NEW_FEEDING)
                 self._emit_new_entries(cid, child, "sleep", sleeps, EVENT_NEW_SLEEP)
                 self._emit_new_entries(cid, child, "diaper", changes, EVENT_NEW_DIAPER)
+                self._emit_new_entries(cid, child, "temperature", temps, EVENT_NEW_TEMPERATURE)
+                self._emit_new_entries(cid, child, "medication", meds, EVENT_NEW_MEDICATION)
 
             # Timer events: detect started (in current set, not previously seen)
             # and stopped (previously seen, not in current set).

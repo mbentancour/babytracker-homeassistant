@@ -1,4 +1,4 @@
-"""Thin async wrapper around the BabyTracker REST API."""
+"""Async wrapper around the BabyTracker REST API."""
 from __future__ import annotations
 
 from typing import Any
@@ -16,7 +16,7 @@ class AuthError(BabyTrackerError):
 
 
 class BabyTrackerClient:
-    """Minimal client — just what the integration needs."""
+    """Minimal async client used by the integration."""
 
     def __init__(
         self,
@@ -26,151 +26,132 @@ class BabyTrackerClient:
         verify_ssl: bool = True,
     ) -> None:
         self._session = session
-        # Strip trailing slash for predictable joining
         self._base = url.rstrip("/")
         self._token = token
         self._verify_ssl = verify_ssl
 
-    async def _get(self, path: str, params: dict | None = None) -> Any:
-        headers = {"Authorization": f"Token {self._token}"}
+    # ---- internal request helpers ----
+
+    def _headers(self, json_body: bool = False) -> dict[str, str]:
+        h = {"Authorization": f"Token {self._token}"}
+        if json_body:
+            h["Content-Type"] = "application/json"
+        return h
+
+    async def _request(self, method: str, path: str, *, params=None, json=None) -> Any:
         url = f"{self._base}{path}"
         try:
-            async with self._session.get(
+            async with self._session.request(
+                method,
                 url,
-                headers=headers,
+                headers=self._headers(json_body=json is not None),
                 params=params,
+                json=json,
                 timeout=ClientTimeout(total=10),
                 ssl=self._verify_ssl,
             ) as resp:
-                if resp.status == 401 or resp.status == 403:
+                if resp.status in (401, 403):
                     raise AuthError(f"authentication failed ({resp.status})")
                 if resp.status >= 400:
                     text = await resp.text()
                     raise BabyTrackerError(f"HTTP {resp.status}: {text[:200]}")
+                if resp.status == 204:
+                    return None
                 return await resp.json()
         except ClientError as err:
             raise BabyTrackerError(f"connection error: {err}") from err
 
+    # ---- read methods ----
+
     async def list_children(self) -> list[dict]:
-        data = await self._get("/api/children/")
+        data = await self._request("GET", "/api/children/")
         return data.get("results", [])
 
     async def list_feedings(self, child_id: int, limit: int = 50) -> list[dict]:
-        data = await self._get(
-            "/api/feedings/",
+        data = await self._request(
+            "GET", "/api/feedings/",
             params={"child": child_id, "limit": limit, "ordering": "-start"},
         )
         return data.get("results", [])
 
     async def list_sleep(self, child_id: int, limit: int = 50) -> list[dict]:
-        data = await self._get(
-            "/api/sleep/",
+        data = await self._request(
+            "GET", "/api/sleep/",
             params={"child": child_id, "limit": limit, "ordering": "-start"},
         )
         return data.get("results", [])
 
     async def list_changes(self, child_id: int, limit: int = 50) -> list[dict]:
-        data = await self._get(
-            "/api/changes/",
+        data = await self._request(
+            "GET", "/api/changes/",
+            params={"child": child_id, "limit": limit, "ordering": "-time"},
+        )
+        return data.get("results", [])
+
+    async def list_temperature(self, child_id: int, limit: int = 5) -> list[dict]:
+        data = await self._request(
+            "GET", "/api/temperature/",
+            params={"child": child_id, "limit": limit, "ordering": "-time"},
+        )
+        return data.get("results", [])
+
+    async def list_medications(self, child_id: int, limit: int = 5) -> list[dict]:
+        data = await self._request(
+            "GET", "/api/medications/",
             params={"child": child_id, "limit": limit, "ordering": "-time"},
         )
         return data.get("results", [])
 
     async def list_timers(self) -> list[dict]:
-        data = await self._get("/api/timers/")
+        data = await self._request("GET", "/api/timers/")
         return data.get("results", [])
 
     async def get_config(self) -> dict:
-        """Lightweight endpoint useful as an auth test."""
-        return await self._get("/api/config")
+        return await self._request("GET", "/api/config")
 
-    # ---- Write methods (require a read_write API token) ----
-
-    async def _post(self, path: str, json: dict) -> Any:
-        headers = {
-            "Authorization": f"Token {self._token}",
-            "Content-Type": "application/json",
-        }
-        url = f"{self._base}{path}"
-        try:
-            async with self._session.post(
-                url,
-                headers=headers,
-                json=json,
-                timeout=ClientTimeout(total=10),
-                ssl=self._verify_ssl,
-            ) as resp:
-                if resp.status in (401, 403):
-                    raise AuthError(f"authentication failed ({resp.status})")
-                if resp.status >= 400:
-                    text = await resp.text()
-                    raise BabyTrackerError(f"HTTP {resp.status}: {text[:200]}")
-                if resp.status == 204:
-                    return None
-                return await resp.json()
-        except ClientError as err:
-            raise BabyTrackerError(f"connection error: {err}") from err
-
-    async def _put(self, path: str, json: dict) -> Any:
-        headers = {
-            "Authorization": f"Token {self._token}",
-            "Content-Type": "application/json",
-        }
-        url = f"{self._base}{path}"
-        try:
-            async with self._session.put(
-                url,
-                headers=headers,
-                json=json,
-                timeout=ClientTimeout(total=10),
-                ssl=self._verify_ssl,
-            ) as resp:
-                if resp.status in (401, 403):
-                    raise AuthError(f"authentication failed ({resp.status})")
-                if resp.status >= 400:
-                    text = await resp.text()
-                    raise BabyTrackerError(f"HTTP {resp.status}: {text[:200]}")
-                if resp.status == 204:
-                    return None
-                return await resp.json()
-        except ClientError as err:
-            raise BabyTrackerError(f"connection error: {err}") from err
-
-    async def _delete(self, path: str) -> None:
-        headers = {"Authorization": f"Token {self._token}"}
-        url = f"{self._base}{path}"
-        try:
-            async with self._session.delete(
-                url,
-                headers=headers,
-                timeout=ClientTimeout(total=10),
-                ssl=self._verify_ssl,
-            ) as resp:
-                if resp.status in (401, 403):
-                    raise AuthError(f"authentication failed ({resp.status})")
-                if resp.status >= 400:
-                    text = await resp.text()
-                    raise BabyTrackerError(f"HTTP {resp.status}: {text[:200]}")
-        except ClientError as err:
-            raise BabyTrackerError(f"connection error: {err}") from err
+    # ---- write methods ----
 
     async def create_feeding(self, payload: dict) -> dict:
-        return await self._post("/api/feedings/", payload)
+        return await self._request("POST", "/api/feedings/", json=payload)
 
     async def create_sleep(self, payload: dict) -> dict:
-        return await self._post("/api/sleep/", payload)
+        return await self._request("POST", "/api/sleep/", json=payload)
 
     async def create_diaper(self, payload: dict) -> dict:
-        return await self._post("/api/changes/", payload)
+        return await self._request("POST", "/api/changes/", json=payload)
+
+    async def create_tummy_time(self, payload: dict) -> dict:
+        return await self._request("POST", "/api/tummy-times/", json=payload)
 
     async def create_pumping(self, payload: dict) -> dict:
-        return await self._post("/api/pumping/", payload)
+        return await self._request("POST", "/api/pumping/", json=payload)
+
+    async def create_temperature(self, payload: dict) -> dict:
+        return await self._request("POST", "/api/temperature/", json=payload)
+
+    async def create_medication(self, payload: dict) -> dict:
+        return await self._request("POST", "/api/medications/", json=payload)
+
+    async def create_note(self, payload: dict) -> dict:
+        return await self._request("POST", "/api/notes/", json=payload)
+
+    async def create_milestone(self, payload: dict) -> dict:
+        return await self._request("POST", "/api/milestones/", json=payload)
+
+    async def create_weight(self, payload: dict) -> dict:
+        return await self._request("POST", "/api/weight/", json=payload)
+
+    async def create_height(self, payload: dict) -> dict:
+        return await self._request("POST", "/api/height/", json=payload)
+
+    async def create_head_circumference(self, payload: dict) -> dict:
+        return await self._request("POST", "/api/head-circumference/", json=payload)
 
     async def create_timer(self, payload: dict) -> dict:
-        return await self._post("/api/timers/", payload)
+        return await self._request("POST", "/api/timers/", json=payload)
 
     async def delete_timer(self, timer_id: int) -> None:
-        await self._delete(f"/api/timers/{timer_id}/")
+        await self._request("DELETE", f"/api/timers/{timer_id}/")
 
     async def set_display(self, payload: dict) -> dict:
-        return await self._put("/api/display", payload)
+        return await self._request("PUT", "/api/display", json=payload)

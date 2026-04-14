@@ -1,98 +1,127 @@
 # BabyTracker — Home Assistant Custom Integration
 
-A native Home Assistant integration that exposes data from your BabyTracker
-instance as sensors. Use these in dashboards, automations, and notifications.
+A native Home Assistant integration for [BabyTracker](https://github.com/mbentancour/babytracker).
+Surfaces every child as a HA device with sensors, fires events on every new
+activity, and exposes services to log everything from automations and
+dashboards — without ever opening the BabyTracker app.
 
 ## What you get
 
-For each child, the integration creates a device with these entities:
+For each child, the integration creates a Home Assistant **device** with the
+following entities:
 
-| Entity                        | Type            | Description                                  |
-| ----------------------------- | --------------- | -------------------------------------------- |
-| `sensor.<name>_last_feeding`  | timestamp       | When the last feeding started                |
-| `sensor.<name>_last_sleep`    | timestamp       | When the last sleep started                  |
-| `sensor.<name>_last_diaper`   | timestamp       | When the last diaper change happened         |
-| `sensor.<name>_feedings_today`| count           | Number of feedings since midnight            |
-| `sensor.<name>_feeding_volume_today` | mL       | Total fed volume today                       |
-| `sensor.<name>_sleep_today`   | hours           | Total sleep today                            |
-| `sensor.<name>_diapers_today` | count           | Number of diapers today                      |
-| `binary_sensor.<name>_active_timer` | on/off    | On while a timer is running for this child   |
+| Entity                                    | Type      | Description                                |
+| ----------------------------------------- | --------- | ------------------------------------------ |
+| `sensor.<name>_last_feeding`              | timestamp | When the last feeding started              |
+| `sensor.<name>_last_sleep`                | timestamp | When the last sleep started                |
+| `sensor.<name>_last_diaper`               | timestamp | When the last diaper change happened       |
+| `sensor.<name>_last_temperature`          | numeric   | Most recent temperature reading            |
+| `sensor.<name>_last_medication`           | text      | Most recent medication name                |
+| `sensor.<name>_feedings_today`            | count     | Number of feedings since midnight          |
+| `sensor.<name>_feeding_volume_today`      | mL        | Total fed volume today                     |
+| `sensor.<name>_sleep_today`               | hours     | Total sleep today                          |
+| `sensor.<name>_diapers_today`             | count     | Number of diapers today                    |
+| `sensor.<name>_wet_diapers_today`         | count     | Number of wet diapers today                |
+| `sensor.<name>_solid_diapers_today`       | count     | Number of solid diapers today              |
+| `binary_sensor.<name>_active_timer`       | on/off    | On while a timer is running for this child |
 
 Polls BabyTracker every 60 seconds.
 
 ## Installation
 
 > **HACS does not manage Home Assistant add-ons.** The main BabyTracker
-> repository is an add-on repository, so HACS won't see this integration if
-> you install it from there. For HACS, the integration must live in its own
-> repository (see below).
+> repository is an add-on repository, so HACS won't see this integration
+> there. This integration lives in its own repo:
 
 ### HACS (custom repository)
 
-This integration is published at: **https://github.com/mbentancour/babytracker-homeassistant**
-
-1. In HACS, open the three-dot menu → **Custom repositories**.
+1. In HACS → ⋮ → **Custom repositories**.
 2. Add `https://github.com/mbentancour/babytracker-homeassistant` with
    category **Integration**.
-3. Search for "BabyTracker" in HACS and install.
+3. Search "BabyTracker" → install.
 4. Restart Home Assistant.
-5. Go to **Settings → Devices & Services → Add Integration** and search for
-   "BabyTracker".
+5. **Settings → Devices & Services → Add Integration → "BabyTracker"**.
 
 ### Manual
 
-1. Download or clone the
-   [babytracker-homeassistant repository](https://github.com/mbentancour/babytracker-homeassistant)
-   (or this `homeassistant/` subfolder of the main repo).
-2. Copy `custom_components/babytracker/` into your Home Assistant
-   `config/custom_components/` directory.
-3. Restart Home Assistant.
-4. Go to **Settings → Devices & Services → Add Integration** and search for
-   "BabyTracker".
+1. Copy `custom_components/babytracker/` into HA's `config/custom_components/`.
+2. Restart Home Assistant.
+3. **Settings → Devices & Services → Add Integration → "BabyTracker"**.
 
 ## Setup
 
 You'll be asked for:
 
-- **URL** — Your BabyTracker URL, e.g. `https://babytracker.local:8099` or
-  the IP/port if on a server. Include scheme (`http://` or `https://`).
-- **API token** — In BabyTracker, go to **Settings → Integrations → API
-  Tokens** and create one. Read-only is enough for sensors.
-- **Verify SSL** — Uncheck this if your BabyTracker uses a self-signed
-  certificate (the default for the Pi appliance image).
+- **URL** — Where BabyTracker is running. Examples:
+  - Pi appliance: `https://babytracker.local:8099`
+  - HA add-on with a host port mapped: `http://homeassistant.local:8099`
+  - HA add-on without a host port (HA OS / Supervised only):
+    `http://local-babytracker:8099`
+  - Remote server: `http://10.0.0.42:8099`
+- **API token** — Create one in BabyTracker → **Settings → Integrations
+  → API Tokens**. The integration needs **Read & Write** to use the logging
+  services; **Read only** is enough for sensors and events.
+- **Verify SSL** — Uncheck for the self-signed cert that ships with the Pi
+  appliance.
 
-## Events
+## Events (use as automation triggers)
 
-The integration fires events on the Home Assistant event bus whenever new
-activity is detected in BabyTracker. Use these as automation triggers:
+The integration fires these events on the HA event bus when activity is
+detected in BabyTracker:
 
-| Event                          | Fired when                          | Data                              |
-| ------------------------------ | ----------------------------------- | --------------------------------- |
-| `babytracker_new_feeding`      | A feeding entry is created          | `child_id`, `child_name`, `entry` |
-| `babytracker_new_sleep`        | A sleep entry is created            | `child_id`, `child_name`, `entry` |
-| `babytracker_new_diaper`       | A diaper change is logged           | `child_id`, `child_name`, `entry` |
-| `babytracker_timer_started`    | A timer starts                      | `child_id`, `child_name`, `timer` |
-| `babytracker_timer_stopped`    | A timer is stopped/deleted          | `timer_id`                        |
+| Event                            | Fired when                       | Data                                |
+| -------------------------------- | -------------------------------- | ----------------------------------- |
+| `babytracker_new_feeding`        | A feeding entry is created       | `child_id`, `child_name`, `entry`   |
+| `babytracker_new_sleep`          | A sleep entry is created         | `child_id`, `child_name`, `entry`   |
+| `babytracker_new_diaper`         | A diaper change is logged        | `child_id`, `child_name`, `entry`   |
+| `babytracker_new_temperature`    | A temperature is logged          | `child_id`, `child_name`, `entry`   |
+| `babytracker_new_medication`     | A medication dose is logged      | `child_id`, `child_name`, `entry`   |
+| `babytracker_timer_started`      | A timer starts                   | `child_id`, `child_name`, `timer`   |
+| `babytracker_timer_stopped`      | A timer is stopped/deleted       | `timer_id`                          |
 
-The `entry` and `timer` payloads contain the full record from the API (id,
-type, method, amount, start/end times, etc.).
+`entry` and `timer` carry the full record from the API (id, type, method,
+amount, start/end times, etc.) so you can branch on any of those fields in
+your automation.
 
-## Services
+## Services (use to control BabyTracker)
 
-The integration registers services to control BabyTracker from Home Assistant:
+Every logging service uses the **HA device picker** for the child — you
+never have to remember a numeric child ID. Time fields default to "now"
+when omitted.
 
-| Service                       | Action                                        |
+### Activity logging
+
+| Service                                | What it does                          |
+| -------------------------------------- | ------------------------------------- |
+| `babytracker.log_feeding`              | Record a feeding                      |
+| `babytracker.log_sleep`                | Record a sleep period                 |
+| `babytracker.log_diaper`               | Record a diaper change                |
+| `babytracker.log_tummy_time`           | Record a tummy time session           |
+| `babytracker.log_pumping`              | Record a pumping session              |
+| `babytracker.log_temperature`          | Record a temperature reading          |
+| `babytracker.log_medication`           | Record a medication dose              |
+| `babytracker.log_note`                 | Record a free-form note               |
+| `babytracker.log_milestone`            | Record a developmental milestone      |
+
+### Measurements
+
+| Service                                | What it does                          |
+| -------------------------------------- | ------------------------------------- |
+| `babytracker.log_weight`               | Record a weight measurement           |
+| `babytracker.log_height`               | Record a height measurement           |
+| `babytracker.log_head_circumference`   | Record a head circumference reading   |
+
+### Timers and display
+
+| Service                       | What it does                                  |
 | ----------------------------- | --------------------------------------------- |
-| `babytracker.log_feeding`     | Record a feeding                              |
-| `babytracker.log_sleep`       | Record a sleep period                         |
-| `babytracker.log_diaper`      | Record a diaper change                        |
 | `babytracker.start_timer`     | Start a timer for a child                     |
-| `babytracker.stop_timer`      | Stop a running timer by ID                    |
+| `babytracker.stop_timer`      | Stop a timer for a child (by name, optional)  |
 | `babytracker.set_slideshow`   | Start/stop the picture frame slideshow        |
+| `babytracker.refresh`         | Force-refresh the integration's sensor data   |
 
-These require a `read_write` API token (configure in BabyTracker → Settings
-→ Integrations → API Tokens). All write services trigger a coordinator
-refresh so sensors update immediately.
+All write services need a **Read & Write** API token and trigger an
+immediate sensor refresh after the call succeeds.
 
 ## Example automations
 
@@ -149,16 +178,40 @@ automation:
             {{ trigger.event.data.entry.type }}
 ```
 
-### One-tap "log a diaper change" button on the dashboard
+### Alert if temperature is high
+
+```yaml
+automation:
+  - alias: "Fever alert"
+    trigger:
+      - platform: event
+        event_type: babytracker_new_temperature
+    condition:
+      - condition: template
+        value_template: "{{ trigger.event.data.entry.temperature >= 38.0 }}"
+    action:
+      - service: notify.mobile_app_phone
+        data:
+          title: "Fever alert"
+          message: >-
+            {{ trigger.event.data.child_name }}: {{ trigger.event.data.entry.temperature }}°
+```
+
+### One-tap "log a wet diaper" button on the dashboard
+
+Drop this script into a dashboard button. The Child picker is shown when
+you call the service from Developer Tools → Services or in the script's
+field selectors:
 
 ```yaml
 script:
-  log_lily_diaper_wet:
+  log_lily_wet_diaper:
     sequence:
       - service: babytracker.log_diaper
         data:
-          child_id: 1
+          device_id: !input lily_device   # set when configuring the script
           wet: true
+          solid: false
 ```
 
 ### Start a sleep timer when the nursery lights turn off
@@ -173,11 +226,31 @@ automation:
     action:
       - service: babytracker.start_timer
         data:
-          child_id: 1
+          device_id: <pick Lily in the UI>
           name: "Sleep"
 ```
 
-### Show the slideshow when the room is dark and idle
+### Stop the sleep timer when motion is detected
+
+```yaml
+automation:
+  - alias: "Stop sleep timer on motion"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.nursery_motion
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: binary_sensor.lily_active_timer
+        state: "on"
+    action:
+      - service: babytracker.stop_timer
+        data:
+          device_id: <pick Lily in the UI>
+          name: "Sleep"
+```
+
+### Show the slideshow when the room is idle for 5 minutes
 
 ```yaml
 automation:
@@ -196,20 +269,24 @@ automation:
 
 ## Troubleshooting
 
-- **"Cannot connect"** — Check that the URL is reachable from your HA host.
-  If using `babytracker.local`, mDNS resolution must work between the two.
-  Try the IP address instead.
-- **"Authentication failed"** — Token may have been revoked. Regenerate in
-  BabyTracker → Settings → Integrations → API Tokens.
+- **"Cannot connect"** — Check the URL is reachable from the HA host. If
+  using `.local` names, mDNS must work; try the IP otherwise.
+- **"Authentication failed"** — Token revoked or wrong scope. Regenerate
+  in BabyTracker → Settings → Integrations → API Tokens.
 - **Self-signed certificates** — Uncheck "Verify SSL" during setup. The
   Pi appliance image ships with a self-signed cert by default.
+- **Service calls fail with "authentication failed"** — Your API token is
+  Read-only. The logging services need Read & Write.
+- **Times look wrong** — BabyTracker treats all timestamps as local time.
+  The integration sends `YYYY-MM-DDTHH:MM:SS` (no timezone) to match. As
+  long as HA's timezone is correct, "now" will line up.
 
-## How it differs from the BabyTracker HA add-on
+## Differences from the BabyTracker HA add-on
 
 - The **add-on** runs BabyTracker itself inside Home Assistant.
-- This **integration** connects to a BabyTracker instance (running anywhere)
-  and surfaces its data as Home Assistant entities.
+- This **integration** connects to a running BabyTracker (anywhere) and
+  exposes its data as Home Assistant entities, events, and services.
 
-You can use both: install the add-on to run BabyTracker locally on your HA
-box, then install this integration on top so your dashboards and automations
-have access to the data.
+You can use both: install the add-on to run BabyTracker on your HA host,
+then install this integration so your dashboards, automations, and voice
+assistants can read and write to it.

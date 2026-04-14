@@ -16,12 +16,16 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     DOMAIN,
+    SENSOR_DIAPERS_SOLID_TODAY,
     SENSOR_DIAPERS_TODAY,
+    SENSOR_DIAPERS_WET_TODAY,
     SENSOR_FEEDING_VOLUME_TODAY,
     SENSOR_FEEDINGS_TODAY,
     SENSOR_LAST_DIAPER,
     SENSOR_LAST_FEEDING,
+    SENSOR_LAST_MEDICATION,
     SENSOR_LAST_SLEEP,
+    SENSOR_LAST_TEMPERATURE,
     SENSOR_SLEEP_HOURS_TODAY,
 )
 from .coordinator import BabyTrackerCoordinator
@@ -50,10 +54,14 @@ async def async_setup_entry(
             LastFeedingSensor(coordinator, cid),
             LastSleepSensor(coordinator, cid),
             LastDiaperSensor(coordinator, cid),
+            LastTemperatureSensor(coordinator, cid),
+            LastMedicationSensor(coordinator, cid),
             FeedingsTodaySensor(coordinator, cid),
             FeedingVolumeTodaySensor(coordinator, cid),
             SleepHoursTodaySensor(coordinator, cid),
             DiapersTodaySensor(coordinator, cid),
+            DiapersWetTodaySensor(coordinator, cid),
+            DiapersSolidTodaySensor(coordinator, cid),
         ])
     async_add_entities(entities)
 
@@ -214,3 +222,98 @@ class DiapersTodaySensor(_ChildSensor):
     def native_value(self):
         snap = self._snapshot
         return snap.diapers_today if snap else 0
+
+
+class DiapersWetTodaySensor(_ChildSensor):
+    _attr_translation_key = SENSOR_DIAPERS_WET_TODAY
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = "diapers"
+
+    def __init__(self, coordinator, child_id):
+        super().__init__(coordinator, child_id, SENSOR_DIAPERS_WET_TODAY)
+        self._attr_name = "Wet diapers today"
+
+    @property
+    def native_value(self):
+        snap = self._snapshot
+        return snap.diapers_wet_today if snap else 0
+
+
+class DiapersSolidTodaySensor(_ChildSensor):
+    _attr_translation_key = SENSOR_DIAPERS_SOLID_TODAY
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = "diapers"
+
+    def __init__(self, coordinator, child_id):
+        super().__init__(coordinator, child_id, SENSOR_DIAPERS_SOLID_TODAY)
+        self._attr_name = "Solid diapers today"
+
+    @property
+    def native_value(self):
+        snap = self._snapshot
+        return snap.diapers_solid_today if snap else 0
+
+
+class LastTemperatureSensor(_ChildSensor):
+    """Sensor that reports the most recent temperature reading.
+
+    State = numeric temperature; the timestamp lives in attributes so the
+    entity is usable on charts (numeric) AND for "when was last reading"
+    automations (via the attribute)."""
+
+    _attr_translation_key = SENSOR_LAST_TEMPERATURE
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+
+    def __init__(self, coordinator, child_id):
+        super().__init__(coordinator, child_id, SENSOR_LAST_TEMPERATURE)
+        self._attr_name = "Last temperature"
+
+    @property
+    def native_value(self):
+        snap = self._snapshot
+        if not snap or not snap.last_temperature:
+            return None
+        return snap.last_temperature.get("temperature")
+
+    @property
+    def extra_state_attributes(self):
+        snap = self._snapshot
+        if not snap or not snap.last_temperature:
+            return None
+        return {
+            "time": snap.last_temperature.get("time"),
+            "notes": snap.last_temperature.get("notes"),
+        }
+
+
+class LastMedicationSensor(_ChildSensor):
+    """Sensor with the most recent medication name as state.
+
+    Useful for "what was the last thing given" cards. The dose & timestamp
+    live in attributes."""
+
+    _attr_translation_key = SENSOR_LAST_MEDICATION
+
+    def __init__(self, coordinator, child_id):
+        super().__init__(coordinator, child_id, SENSOR_LAST_MEDICATION)
+        self._attr_name = "Last medication"
+
+    @property
+    def native_value(self):
+        snap = self._snapshot
+        if not snap or not snap.last_medication:
+            return None
+        return snap.last_medication.get("name")
+
+    @property
+    def extra_state_attributes(self):
+        snap = self._snapshot
+        if not snap or not snap.last_medication:
+            return None
+        m = snap.last_medication
+        return {
+            "time": m.get("time"),
+            "dosage": m.get("dosage"),
+            "dosage_unit": m.get("dosage_unit"),
+            "notes": m.get("notes"),
+        }

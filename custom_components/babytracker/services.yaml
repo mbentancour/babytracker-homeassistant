@@ -2,17 +2,17 @@ log_feeding:
   name: Log feeding
   description: Record a feeding for a child.
   fields:
-    child_id:
-      name: Child ID
-      description: Numeric ID of the child (visible in BabyTracker URL or via the API).
+    device_id:
+      name: Child
+      description: Pick the child this feeding belongs to.
       required: true
-      example: 1
       selector:
-        number: { mode: box, min: 1 }
+        device:
+          integration: babytracker
     type:
       name: Type
       description: What was fed.
-      required: true
+      default: "breast milk"
       selector:
         select:
           options:
@@ -23,7 +23,7 @@ log_feeding:
     method:
       name: Method
       description: How it was fed.
-      required: true
+      default: "bottle"
       selector:
         select:
           options:
@@ -34,56 +34,64 @@ log_feeding:
             - "parent fed"
             - "self fed"
     amount:
-      name: Amount (mL)
-      description: Volume fed in mL (omit if not measured).
+      name: Amount
+      description: Volume in mL (only for bottles / pumped milk).
       example: 120
       selector:
-        number: { mode: box, min: 0, step: 1 }
+        number: { mode: box, min: 0, max: 500, step: 1, unit_of_measurement: "mL" }
     duration_minutes:
-      name: Duration (minutes)
-      description: Total feeding duration. Defaults to a 0-minute interval at "now".
-      example: 15
+      name: Duration
+      description: How long the feeding lasted.
+      default: 0
       selector:
-        number: { mode: box, min: 0, step: 1 }
+        number: { mode: box, min: 0, max: 240, step: 1, unit_of_measurement: "min" }
+    ended_at:
+      name: Ended at
+      description: When the feeding ended. Defaults to now if omitted.
+      selector: { datetime: }
     notes:
       name: Notes
-      example: "Took it well"
-      selector: { text: }
+      selector: { text: { multiline: true } }
 
 log_sleep:
   name: Log sleep
   description: Record a sleep period for a child.
   fields:
-    child_id:
-      name: Child ID
+    device_id:
+      name: Child
       required: true
-      selector: { number: { mode: box, min: 1 } }
+      selector: { device: { integration: babytracker } }
     duration_minutes:
-      name: Duration (minutes)
-      description: How long the sleep lasted, ending now.
+      name: Duration
+      description: How long the sleep lasted.
       required: true
       example: 90
-      selector: { number: { mode: box, min: 1, step: 1 } }
+      selector:
+        number: { mode: box, min: 1, max: 1440, step: 1, unit_of_measurement: "min" }
     nap:
       name: Nap
-      description: Whether this was a nap (vs. nighttime sleep).
+      description: Daytime nap (otherwise nighttime sleep).
       default: true
       selector: { boolean: }
+    ended_at:
+      name: Ended at
+      description: When the sleep ended. Defaults to now if omitted.
+      selector: { datetime: }
     notes:
       name: Notes
-      selector: { text: }
+      selector: { text: { multiline: true } }
 
 log_diaper:
   name: Log diaper change
-  description: Record a diaper change.
+  description: Record a diaper change for a child.
   fields:
-    child_id:
-      name: Child ID
+    device_id:
+      name: Child
       required: true
-      selector: { number: { mode: box, min: 1 } }
+      selector: { device: { integration: babytracker } }
     wet:
       name: Wet
-      default: false
+      default: true
       selector: { boolean: }
     solid:
       name: Solid
@@ -91,43 +99,258 @@ log_diaper:
       selector: { boolean: }
     color:
       name: Color
-      description: Optional color of the stool.
+      description: Color of stool, if relevant.
       selector:
         select:
           options:
-            - ""
+            - { value: "", label: "(none)" }
             - "black"
             - "brown"
             - "green"
             - "yellow"
+    when:
+      name: When
+      description: When the change happened. Defaults to now.
+      selector: { datetime: }
     notes:
       name: Notes
+      selector: { text: { multiline: true } }
+
+log_tummy_time:
+  name: Log tummy time
+  description: Record a tummy time session.
+  fields:
+    device_id:
+      name: Child
+      required: true
+      selector: { device: { integration: babytracker } }
+    duration_minutes:
+      name: Duration
+      required: true
+      selector:
+        number: { mode: box, min: 1, max: 240, step: 1, unit_of_measurement: "min" }
+    ended_at:
+      name: Ended at
+      selector: { datetime: }
+    milestone:
+      name: Milestone
+      description: Anything notable that happened.
       selector: { text: }
+    notes:
+      name: Notes
+      selector: { text: { multiline: true } }
+
+log_pumping:
+  name: Log pumping
+  description: Record a pumping session.
+  fields:
+    device_id:
+      name: Child
+      required: true
+      selector: { device: { integration: babytracker } }
+    duration_minutes:
+      name: Duration
+      required: true
+      selector:
+        number: { mode: box, min: 1, max: 240, step: 1, unit_of_measurement: "min" }
+    amount:
+      name: Amount
+      description: Amount pumped in mL.
+      selector:
+        number: { mode: box, min: 0, max: 500, step: 1, unit_of_measurement: "mL" }
+    ended_at:
+      name: Ended at
+      selector: { datetime: }
+    notes:
+      name: Notes
+      selector: { text: { multiline: true } }
+
+log_temperature:
+  name: Log temperature
+  description: Record a temperature reading.
+  fields:
+    device_id:
+      name: Child
+      required: true
+      selector: { device: { integration: babytracker } }
+    temperature:
+      name: Temperature
+      description: Reading in your configured unit (°C or °F).
+      required: true
+      example: 37.2
+      selector: { number: { mode: box, min: 30, max: 110, step: 0.1 } }
+    when:
+      name: When
+      selector: { datetime: }
+    notes:
+      name: Notes
+      selector: { text: { multiline: true } }
+
+log_medication:
+  name: Log medication
+  description: Record a medication dose given.
+  fields:
+    device_id:
+      name: Child
+      required: true
+      selector: { device: { integration: babytracker } }
+    name:
+      name: Medication name
+      required: true
+      example: "Paracetamol"
+      selector: { text: }
+    dosage:
+      name: Dosage
+      example: 2.5
+      selector: { number: { mode: box, min: 0, step: 0.1 } }
+    dosage_unit:
+      name: Unit
+      default: "ml"
+      selector:
+        select:
+          options:
+            - "ml"
+            - "mg"
+            - "drop"
+            - "drops"
+            - "tablet"
+            - "tablets"
+    when:
+      name: When
+      selector: { datetime: }
+    notes:
+      name: Notes
+      selector: { text: { multiline: true } }
+
+log_note:
+  name: Log note
+  description: Record a free-form note.
+  fields:
+    device_id:
+      name: Child
+      required: true
+      selector: { device: { integration: babytracker } }
+    note:
+      name: Note
+      required: true
+      selector: { text: { multiline: true } }
+    when:
+      name: When
+      selector: { datetime: }
+
+log_milestone:
+  name: Log milestone
+  description: Record a developmental milestone.
+  fields:
+    device_id:
+      name: Child
+      required: true
+      selector: { device: { integration: babytracker } }
+    title:
+      name: Title
+      required: true
+      example: "First smile"
+      selector: { text: }
+    category:
+      name: Category
+      default: "other"
+      selector:
+        select:
+          options:
+            - "motor"
+            - "cognitive"
+            - "social"
+            - "language"
+            - "other"
+    description:
+      name: Description
+      selector: { text: { multiline: true } }
+    date:
+      name: Date
+      description: When the milestone was reached. Defaults to today.
+      selector: { date: }
+
+log_weight:
+  name: Log weight
+  description: Record a weight measurement.
+  fields:
+    device_id:
+      name: Child
+      required: true
+      selector: { device: { integration: babytracker } }
+    weight:
+      name: Weight
+      description: Weight in your configured unit (kg or lb).
+      required: true
+      example: 4.2
+      selector: { number: { mode: box, min: 0, max: 100, step: 0.01 } }
+    date:
+      name: Date
+      selector: { date: }
+
+log_height:
+  name: Log height
+  description: Record a height measurement.
+  fields:
+    device_id:
+      name: Child
+      required: true
+      selector: { device: { integration: babytracker } }
+    height:
+      name: Height
+      description: Height in your configured unit (cm or in).
+      required: true
+      example: 55
+      selector: { number: { mode: box, min: 0, max: 250, step: 0.1 } }
+    date:
+      name: Date
+      selector: { date: }
+
+log_head_circumference:
+  name: Log head circumference
+  description: Record a head circumference measurement.
+  fields:
+    device_id:
+      name: Child
+      required: true
+      selector: { device: { integration: babytracker } }
+    head_circumference:
+      name: Head circumference
+      required: true
+      example: 35.5
+      selector: { number: { mode: box, min: 0, max: 80, step: 0.1 } }
+    date:
+      name: Date
+      selector: { date: }
 
 start_timer:
   name: Start timer
-  description: Start a timer for a child (e.g. Feeding, Sleep, Tummy Time).
+  description: Start a timer (e.g. Sleep, Feeding, Tummy Time) for a child.
   fields:
-    child_id:
-      name: Child ID
+    device_id:
+      name: Child
       required: true
-      selector: { number: { mode: box, min: 1 } }
+      selector: { device: { integration: babytracker } }
     name:
       name: Timer name
-      description: Used to identify the timer (matches the activity it tracks).
+      description: Use a name that matches the activity, e.g. "Sleep" or "Feeding".
       required: true
       example: "Sleep"
       selector: { text: }
 
 stop_timer:
   name: Stop timer
-  description: Stop / cancel a running timer by ID.
+  description: Stop a running timer for a child. If no name is given, all of this child's timers are stopped.
   fields:
-    timer_id:
-      name: Timer ID
-      description: Numeric ID from the babytracker_timer_started event.
+    device_id:
+      name: Child
       required: true
-      selector: { number: { mode: box, min: 1 } }
+      selector: { device: { integration: babytracker } }
+    name:
+      name: Timer name
+      description: Optional. Stops only timers with this exact name (case-insensitive).
+      example: "Sleep"
+      selector: { text: }
 
 set_slideshow:
   name: Picture frame slideshow
@@ -138,7 +361,11 @@ set_slideshow:
       required: true
       selector: { boolean: }
     device:
-      name: Device name
-      description: Optional. If omitted, targets all connected displays.
+      name: Display device name
+      description: Optional. Configured in BabyTracker → Settings → Device name. Omit to target all displays.
       example: "nursery-tablet"
       selector: { text: }
+
+refresh:
+  name: Refresh
+  description: Force the integration to immediately refresh sensor data from BabyTracker.
