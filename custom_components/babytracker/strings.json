@@ -40,33 +40,392 @@
   },
   "entity": {
     "sensor": {
-      "last_feeding": { "name": "Last feeding" },
-      "last_sleep": { "name": "Last sleep" },
-      "last_diaper": { "name": "Last diaper" },
-      "last_temperature": { "name": "Last temperature" },
-      "last_medication": { "name": "Last medication" },
-      "feedings_today": { "name": "Feedings today" },
-      "feeding_volume_today": { "name": "Feeding volume today" },
-      "sleep_hours_today": { "name": "Sleep today" },
-      "diapers_today": { "name": "Diapers today" },
-      "diapers_wet_today": { "name": "Wet diapers today" },
-      "diapers_solid_today": { "name": "Solid diapers today" },
-      "hours_since_feeding": { "name": "Hours since last feeding" },
-      "hours_since_sleep": { "name": "Hours since last sleep" },
-      "hours_since_diaper": { "name": "Hours since last diaper" },
-      "age_days": { "name": "Age (days)" },
-      "age_weeks": { "name": "Age (weeks)" },
-      "age_months": { "name": "Age (months)" },
-      "latest_weight": { "name": "Latest weight" },
-      "latest_height": { "name": "Latest height" },
-      "latest_head_circumference": { "name": "Latest head circumference" },
-      "latest_bmi": { "name": "Latest BMI" },
-      "active_timer_duration": { "name": "Active timer duration" },
-      "backup_last_success": { "name": "Last successful backup" },
-      "backup_count": { "name": "Backup count" }
+      "last_feeding": {
+        "name": "Last feeding"
+      },
+      "last_sleep": {
+        "name": "Last sleep"
+      },
+      "last_diaper": {
+        "name": "Last diaper"
+      },
+      "last_temperature": {
+        "name": "Last temperature"
+      },
+      "last_medication": {
+        "name": "Last medication"
+      },
+      "feedings_today": {
+        "name": "Feedings today"
+      },
+      "feeding_volume_today": {
+        "name": "Feeding volume today"
+      },
+      "sleep_hours_today": {
+        "name": "Sleep today"
+      },
+      "diapers_today": {
+        "name": "Diapers today"
+      },
+      "diapers_wet_today": {
+        "name": "Wet diapers today"
+      },
+      "diapers_solid_today": {
+        "name": "Solid diapers today"
+      },
+      "hours_since_feeding": {
+        "name": "Hours since last feeding"
+      },
+      "hours_since_sleep": {
+        "name": "Hours since last sleep"
+      },
+      "hours_since_diaper": {
+        "name": "Hours since last diaper"
+      },
+      "age_days": {
+        "name": "Age (days)"
+      },
+      "age_weeks": {
+        "name": "Age (weeks)"
+      },
+      "age_months": {
+        "name": "Age (months)"
+      },
+      "latest_weight": {
+        "name": "Latest weight"
+      },
+      "latest_height": {
+        "name": "Latest height"
+      },
+      "latest_head_circumference": {
+        "name": "Latest head circumference"
+      },
+      "latest_bmi": {
+        "name": "Latest BMI"
+      },
+      "active_timer_duration": {
+        "name": "Active timer duration"
+      },
+      "backup_last_success": {
+        "name": "Last successful backup"
+      },
+      "backup_count": {
+        "name": "Backup count"
+      }
     },
     "binary_sensor": {
-      "active_timer": { "name": "Active timer" }
+      "active_timer": {
+        "name": "Active timer"
+      }
+    }
+  },
+  "services": {
+    "log_feeding": {
+      "name": "Log feeding",
+      "description": "Record a feeding for a child.",
+      "fields": {
+        "device_id": {
+          "name": "Child",
+          "description": "Pick the child this feeding belongs to."
+        },
+        "type": {
+          "name": "Type",
+          "description": "What was fed."
+        },
+        "method": {
+          "name": "Method",
+          "description": "How it was fed."
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "Volume in mL (only for bottles / pumped milk)."
+        },
+        "duration_minutes": {
+          "name": "Duration",
+          "description": "How long the feeding lasted."
+        },
+        "ended_at": {
+          "name": "Ended at",
+          "description": "When the feeding ended. Defaults to now if omitted."
+        },
+        "notes": {
+          "name": "Notes"
+        }
+      }
+    },
+    "log_sleep": {
+      "name": "Log sleep",
+      "description": "Record a sleep period for a child.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "duration_minutes": {
+          "name": "Duration",
+          "description": "How long the sleep lasted."
+        },
+        "nap": {
+          "name": "Nap",
+          "description": "Daytime nap (otherwise nighttime sleep)."
+        },
+        "ended_at": {
+          "name": "Ended at",
+          "description": "When the sleep ended. Defaults to now if omitted."
+        },
+        "notes": {
+          "name": "Notes"
+        }
+      }
+    },
+    "log_diaper": {
+      "name": "Log diaper change",
+      "description": "Record a diaper change for a child.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "wet": {
+          "name": "Wet"
+        },
+        "solid": {
+          "name": "Solid"
+        },
+        "color": {
+          "name": "Color",
+          "description": "Color of stool, if relevant."
+        },
+        "when": {
+          "name": "When",
+          "description": "When the change happened. Defaults to now."
+        },
+        "notes": {
+          "name": "Notes"
+        }
+      }
+    },
+    "log_tummy_time": {
+      "name": "Log tummy time",
+      "description": "Record a tummy time session.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "duration_minutes": {
+          "name": "Duration"
+        },
+        "ended_at": {
+          "name": "Ended at"
+        },
+        "milestone": {
+          "name": "Milestone",
+          "description": "Anything notable that happened."
+        },
+        "notes": {
+          "name": "Notes"
+        }
+      }
+    },
+    "log_pumping": {
+      "name": "Log pumping",
+      "description": "Record a pumping session.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "duration_minutes": {
+          "name": "Duration"
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "Amount pumped in mL."
+        },
+        "ended_at": {
+          "name": "Ended at"
+        },
+        "notes": {
+          "name": "Notes"
+        }
+      }
+    },
+    "log_temperature": {
+      "name": "Log temperature",
+      "description": "Record a temperature reading.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "temperature": {
+          "name": "Temperature",
+          "description": "Reading in your configured unit (°C or °F)."
+        },
+        "when": {
+          "name": "When"
+        },
+        "notes": {
+          "name": "Notes"
+        }
+      }
+    },
+    "log_medication": {
+      "name": "Log medication",
+      "description": "Record a medication dose given.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "name": {
+          "name": "Medication name"
+        },
+        "dosage": {
+          "name": "Dosage"
+        },
+        "dosage_unit": {
+          "name": "Unit"
+        },
+        "when": {
+          "name": "When"
+        },
+        "notes": {
+          "name": "Notes"
+        }
+      }
+    },
+    "log_note": {
+      "name": "Log note",
+      "description": "Record a free-form note.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "note": {
+          "name": "Note"
+        },
+        "when": {
+          "name": "When"
+        }
+      }
+    },
+    "log_milestone": {
+      "name": "Log milestone",
+      "description": "Record a developmental milestone.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "title": {
+          "name": "Title"
+        },
+        "category": {
+          "name": "Category"
+        },
+        "description": {
+          "name": "Description"
+        },
+        "date": {
+          "name": "Date",
+          "description": "When the milestone was reached. Defaults to today."
+        }
+      }
+    },
+    "log_weight": {
+      "name": "Log weight",
+      "description": "Record a weight measurement.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "weight": {
+          "name": "Weight",
+          "description": "Weight in your configured unit (kg or lb)."
+        },
+        "date": {
+          "name": "Date"
+        }
+      }
+    },
+    "log_height": {
+      "name": "Log height",
+      "description": "Record a height measurement.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "height": {
+          "name": "Height",
+          "description": "Height in your configured unit (cm or in)."
+        },
+        "date": {
+          "name": "Date"
+        }
+      }
+    },
+    "log_head_circumference": {
+      "name": "Log head circumference",
+      "description": "Record a head circumference measurement.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "head_circumference": {
+          "name": "Head circumference"
+        },
+        "date": {
+          "name": "Date"
+        }
+      }
+    },
+    "start_timer": {
+      "name": "Start timer",
+      "description": "Start a timer (e.g. Sleep, Feeding, Tummy Time) for a child.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "name": {
+          "name": "Timer name",
+          "description": "Use a name that matches the activity, e.g. \"Sleep\" or \"Feeding\"."
+        }
+      }
+    },
+    "stop_timer": {
+      "name": "Stop timer",
+      "description": "Stop a running timer for a child. If no name is given, all of this child's timers are stopped.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "name": {
+          "name": "Timer name",
+          "description": "Optional. Stops only timers with this exact name (case-insensitive)."
+        }
+      }
+    },
+    "set_slideshow": {
+      "name": "Picture frame slideshow",
+      "description": "Start or stop the slideshow on a connected display.",
+      "fields": {
+        "enabled": {
+          "name": "Enabled"
+        },
+        "device": {
+          "name": "Display device name",
+          "description": "Optional. Configured in BabyTracker → Settings → Device name. Omit to target all displays."
+        }
+      }
+    },
+    "refresh": {
+      "name": "Refresh",
+      "description": "Force the integration to immediately refresh sensor data from BabyTracker."
+    },
+    "create_backup": {
+      "name": "Create backup",
+      "description": "Trigger a one-off BabyTracker backup. The archive is uploaded to every enabled destination, or only to the destinations you list. Encrypted destinations without a stored passphrase are skipped silently — use the BabyTracker UI for those.",
+      "fields": {
+        "destinations": {
+          "name": "Destination IDs",
+          "description": "Optional list of destination IDs. Leave empty to target every enabled destination. Destination IDs can be seen in the BabyTracker Settings UI (or in the ID of each `backup_*` sensor device)."
+        }
+      }
     }
   }
 }
