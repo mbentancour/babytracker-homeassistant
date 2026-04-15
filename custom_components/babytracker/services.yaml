@@ -111,10 +111,10 @@ log_diaper:
         select:
           options:
             - { value: "", label: "(none)" }
-            - "black"
-            - "brown"
-            - "green"
-            - "yellow"
+            - { value: "black", label: "Black" }
+            - { value: "brown", label: "Brown" }
+            - { value: "green", label: "Green" }
+            - { value: "yellow", label: "Yellow" }
     when:
       name: When
       description: When the change happened. Defaults to now.
