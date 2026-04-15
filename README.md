@@ -81,9 +81,15 @@ You'll be asked for:
 
 - **URL** — Where BabyTracker is running. Examples:
   - Pi appliance: `https://babytracker.local:8099`
+  - **HA add-on (no port exposed, recommended): `http://babytracker:8099`**
+    The add-on sets `hostname: babytracker` so peer containers resolve it
+    directly over Supervisor's internal Docker network.
+  - HA add-on, fallback if the short hostname fails: use the Supervisor-
+    generated form `http://<hash>-babytracker:8099` where `<hash>` is an
+    8-char SHA1 of the repository URL. For `https://github.com/mbentancour/babytracker`
+    that's `http://20e180a5-babytracker:8099`. (You can confirm the hash
+    with `python3 -c "import hashlib; print(hashlib.sha1(b'https://github.com/mbentancour/babytracker').hexdigest()[:8])"`.)
   - HA add-on with a host port mapped: `http://homeassistant.local:8099`
-  - HA add-on without a host port (HA OS / Supervised only):
-    `http://local-babytracker:8099`
   - Remote server: `http://10.0.0.42:8099`
 - **API token** — Create one in BabyTracker → **Settings → Integrations
   → API Tokens**. The integration needs **Read & Write** to use the logging
