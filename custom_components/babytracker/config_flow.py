@@ -23,7 +23,7 @@ def _build_schema(defaults: dict[str, Any]) -> vol.Schema:
     """
     return vol.Schema(
         {
-            vol.Required(CONF_URL, default=defaults.get(CONF_URL, "http://babytracker:8099")): str,
+            vol.Required(CONF_URL, default=defaults.get(CONF_URL, "")): str,
             vol.Required(CONF_TOKEN, default=defaults.get(CONF_TOKEN, "")): str,
             vol.Optional(CONF_VERIFY_SSL, default=defaults.get(CONF_VERIFY_SSL, False)): bool,
         }

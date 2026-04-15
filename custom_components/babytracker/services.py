@@ -70,24 +70,44 @@ MEDICATION_UNITS = ["ml", "mg", "drop", "drops", "tablet", "tablets"]
 # ----------------------------------------------------------------------------
 
 
-def _local_iso(dt: datetime | None = None) -> str:
-    """Format a datetime as the API expects: YYYY-MM-DDTHH:MM:SS, no timezone.
+def _local_iso(dt: datetime | str | None = None) -> str:
+    """Format a datetime as the API expects: YYYY-MM-DDTHH:MM:SS, no timezone,
+    no fractional seconds.
 
     The BabyTracker backend parses with ``time.Parse("2006-01-02T15:04:05", ...)``
-    which fails on any timezone suffix. Always use this helper for time fields.
+    which rejects timezone suffixes, fractional seconds, or a space separator.
+    This helper normalises every input shape HA might pass us:
+
+    - ``None`` → now (local time).
+    - ``datetime`` (naive or aware) → stripped to naive, microseconds dropped.
+    - ``str`` (already formatted) → parsed, then renormalised, so that a
+      template value like ``{{ now() }}`` (which resolves to an ISO string
+      with timezone offset and microseconds) survives the round-trip.
     """
     if dt is None:
         dt = datetime.now()
-    # Strip timezone info if present — backend treats values as local time.
-    return dt.replace(tzinfo=None, microsecond=0).isoformat()
+    elif isinstance(dt, str):
+        # HA templates often return tz-aware ISO strings; normalise those.
+        try:
+            dt = datetime.fromisoformat(dt.replace("Z", "+00:00"))
+        except ValueError as err:
+            raise ValueError(f"unparseable datetime: {dt!r}") from err
+    return dt.replace(tzinfo=None, microsecond=0).isoformat(timespec="seconds")
 
 
 def _date_iso(d: date | str | None = None) -> str:
+    """Format a date as the API expects: YYYY-MM-DD. Accepts datetime (takes
+    the date component), date, ISO-8601 string, or None (= today)."""
     if d is None:
         return date.today().isoformat()
+    if isinstance(d, datetime):
+        return d.date().isoformat()
+    if isinstance(d, date):
+        return d.isoformat()
     if isinstance(d, str):
-        return d
-    return d.isoformat()
+        # Accept both "YYYY-MM-DD" and longer ISO strings; keep only the date.
+        return d[:10]
+    raise TypeError(f"unsupported date value: {d!r}")
 
 
 def _coordinator(hass: HomeAssistant) -> BabyTrackerCoordinator:
@@ -262,10 +282,19 @@ def _build_duration_payload(call: ServiceCall, child_id: int) -> dict[str, Any]:
 async def _do_create(call: ServiceCall, fn_name: str, payload: dict) -> None:
     coord = _coordinator(call.hass)
     fn = getattr(coord.client, fn_name)
+    # Log at debug so users can enable `logger: babytracker: debug` and see
+    # exactly what we sent when a call fails — saves the "what did the
+    # integration actually do?" debugging loop.
+    _LOGGER.debug("calling %s with payload=%s", fn_name, payload)
     try:
         await fn(payload)
     except BabyTrackerError as err:
-        raise HomeAssistantError(f"BabyTracker request failed: {err}") from err
+        # Include the payload in the user-visible error. HA's UI truncates
+        # long messages but shows the full thing in the logbook entry, which
+        # is enough to spot "wrong date format" issues at a glance.
+        raise HomeAssistantError(
+            f"BabyTracker {fn_name} failed: {err} — payload sent: {payload}"
+        ) from err
     await coord.async_request_refresh()
 
 

@@ -8,7 +8,9 @@ log_feeding:
       required: true
       selector:
         device:
-          integration: babytracker
+          filter:
+            - integration: babytracker
+              model: Child
     type:
       name: Type
       description: What was fed.
@@ -60,7 +62,11 @@ log_sleep:
     device_id:
       name: Child
       required: true
-      selector: { device: { integration: babytracker } }
+      selector:
+        device:
+          filter:
+            - integration: babytracker
+              model: Child
     duration_minutes:
       name: Duration
       description: How long the sleep lasted.
@@ -88,7 +94,11 @@ log_diaper:
     device_id:
       name: Child
       required: true
-      selector: { device: { integration: babytracker } }
+      selector:
+        device:
+          filter:
+            - integration: babytracker
+              model: Child
     wet:
       name: Wet
       default: true
@@ -123,7 +133,11 @@ log_tummy_time:
     device_id:
       name: Child
       required: true
-      selector: { device: { integration: babytracker } }
+      selector:
+        device:
+          filter:
+            - integration: babytracker
+              model: Child
     duration_minutes:
       name: Duration
       required: true
@@ -147,7 +161,11 @@ log_pumping:
     device_id:
       name: Child
       required: true
-      selector: { device: { integration: babytracker } }
+      selector:
+        device:
+          filter:
+            - integration: babytracker
+              model: Child
     duration_minutes:
       name: Duration
       required: true
@@ -172,7 +190,11 @@ log_temperature:
     device_id:
       name: Child
       required: true
-      selector: { device: { integration: babytracker } }
+      selector:
+        device:
+          filter:
+            - integration: babytracker
+              model: Child
     temperature:
       name: Temperature
       description: Reading in your configured unit (°C or °F).
@@ -193,7 +215,11 @@ log_medication:
     device_id:
       name: Child
       required: true
-      selector: { device: { integration: babytracker } }
+      selector:
+        device:
+          filter:
+            - integration: babytracker
+              model: Child
     name:
       name: Medication name
       required: true
@@ -229,7 +255,11 @@ log_note:
     device_id:
       name: Child
       required: true
-      selector: { device: { integration: babytracker } }
+      selector:
+        device:
+          filter:
+            - integration: babytracker
+              model: Child
     note:
       name: Note
       required: true
@@ -245,7 +275,11 @@ log_milestone:
     device_id:
       name: Child
       required: true
-      selector: { device: { integration: babytracker } }
+      selector:
+        device:
+          filter:
+            - integration: babytracker
+              model: Child
     title:
       name: Title
       required: true
@@ -277,7 +311,11 @@ log_weight:
     device_id:
       name: Child
       required: true
-      selector: { device: { integration: babytracker } }
+      selector:
+        device:
+          filter:
+            - integration: babytracker
+              model: Child
     weight:
       name: Weight
       description: Weight in your configured unit (kg or lb).
@@ -295,7 +333,11 @@ log_height:
     device_id:
       name: Child
       required: true
-      selector: { device: { integration: babytracker } }
+      selector:
+        device:
+          filter:
+            - integration: babytracker
+              model: Child
     height:
       name: Height
       description: Height in your configured unit (cm or in).
@@ -313,7 +355,11 @@ log_head_circumference:
     device_id:
       name: Child
       required: true
-      selector: { device: { integration: babytracker } }
+      selector:
+        device:
+          filter:
+            - integration: babytracker
+              model: Child
     head_circumference:
       name: Head circumference
       required: true
@@ -330,7 +376,11 @@ start_timer:
     device_id:
       name: Child
       required: true
-      selector: { device: { integration: babytracker } }
+      selector:
+        device:
+          filter:
+            - integration: babytracker
+              model: Child
     name:
       name: Timer name
       description: Use a name that matches the activity, e.g. "Sleep" or "Feeding".
@@ -345,7 +395,11 @@ stop_timer:
     device_id:
       name: Child
       required: true
-      selector: { device: { integration: babytracker } }
+      selector:
+        device:
+          filter:
+            - integration: babytracker
+              model: Child
     name:
       name: Timer name
       description: Optional. Stops only timers with this exact name (case-insensitive).

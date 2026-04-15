@@ -81,14 +81,17 @@ You'll be asked for:
 
 - **URL** — Where BabyTracker is running. Examples:
   - Pi appliance: `https://babytracker.local:8099`
-  - **HA add-on (no port exposed, recommended): `http://babytracker:8099`**
-    The add-on sets `hostname: babytracker` so peer containers resolve it
-    directly over Supervisor's internal Docker network.
-  - HA add-on, fallback if the short hostname fails: use the Supervisor-
-    generated form `http://<hash>-babytracker:8099` where `<hash>` is an
-    8-char SHA1 of the repository URL. For `https://github.com/mbentancour/babytracker`
-    that's `http://20e180a5-babytracker:8099`. (You can confirm the hash
-    with `python3 -c "import hashlib; print(hashlib.sha1(b'https://github.com/mbentancour/babytracker').hexdigest()[:8])"`.)
+  - **HA add-on (no port exposed, recommended): `http://<hash>-babytracker:8099`.**
+    Supervisor assigns each add-on container a DNS name of the form
+    `<hash>-<slug>`, where `<hash>` is the 8-char SHA1 of the exact URL you
+    typed when adding the add-on repository. You can find yours two ways:
+    - **From the Supervisor logs**, look for a line like
+      `Updating image <hash>/amd64-addon-babytracker:…`. The prefix before
+      the `/` is the hash. This is the most reliable source of truth.
+    - **By hand**: `python3 -c "import hashlib; print(hashlib.sha1(b'<URL>').hexdigest()[:8])"`
+      where `<URL>` is the exact string you entered in **Supervisor →
+      Add-on Store → ⋮ → Repositories**. A trailing `.git` or `/` changes
+      the hash.
   - HA add-on with a host port mapped: `http://homeassistant.local:8099`
   - Remote server: `http://10.0.0.42:8099`
 - **API token** — Create one in BabyTracker → **Settings → Integrations
