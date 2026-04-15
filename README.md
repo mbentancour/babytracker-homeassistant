@@ -10,22 +10,43 @@ dashboards — without ever opening the BabyTracker app.
 For each child, the integration creates a Home Assistant **device** with the
 following entities:
 
-| Entity                                    | Type      | Description                                |
-| ----------------------------------------- | --------- | ------------------------------------------ |
-| `sensor.<name>_last_feeding`              | timestamp | When the last feeding started              |
-| `sensor.<name>_last_sleep`                | timestamp | When the last sleep started                |
-| `sensor.<name>_last_diaper`               | timestamp | When the last diaper change happened       |
-| `sensor.<name>_last_temperature`          | numeric   | Most recent temperature reading            |
-| `sensor.<name>_last_medication`           | text      | Most recent medication name                |
-| `sensor.<name>_feedings_today`            | count     | Number of feedings since midnight          |
-| `sensor.<name>_feeding_volume_today`      | mL        | Total fed volume today                     |
-| `sensor.<name>_sleep_today`               | hours     | Total sleep today                          |
-| `sensor.<name>_diapers_today`             | count     | Number of diapers today                    |
-| `sensor.<name>_wet_diapers_today`         | count     | Number of wet diapers today                |
-| `sensor.<name>_solid_diapers_today`       | count     | Number of solid diapers today              |
-| `binary_sensor.<name>_active_timer`       | on/off    | On while a timer is running for this child |
+| Entity                                         | Type      | Description                                |
+| ---------------------------------------------- | --------- | ------------------------------------------ |
+| `sensor.<name>_last_feeding`                   | timestamp | When the last feeding started              |
+| `sensor.<name>_last_sleep`                     | timestamp | When the last sleep started                |
+| `sensor.<name>_last_diaper`                    | timestamp | When the last diaper change happened       |
+| `sensor.<name>_last_temperature`               | numeric   | Most recent temperature reading            |
+| `sensor.<name>_last_medication`                | text      | Most recent medication name                |
+| `sensor.<name>_hours_since_last_feeding`       | hours     | Numeric alternative to the timestamp — handy in automation conditions |
+| `sensor.<name>_hours_since_last_sleep`         | hours     | Hours since the last sleep **ended** (= "awake since") |
+| `sensor.<name>_hours_since_last_diaper`        | hours     | Hours since the last diaper change         |
+| `sensor.<name>_feedings_today`                 | count     | Number of feedings since midnight          |
+| `sensor.<name>_feeding_volume_today`           | mL        | Total fed volume today                     |
+| `sensor.<name>_sleep_today`                    | hours     | Total sleep today                          |
+| `sensor.<name>_diapers_today`                  | count     | Number of diapers today                    |
+| `sensor.<name>_wet_diapers_today`              | count     | Number of wet diapers today                |
+| `sensor.<name>_solid_diapers_today`            | count     | Number of solid diapers today              |
+| `sensor.<name>_age_days` / `_weeks` / `_months`| numeric   | Age derived from the birth date            |
+| `sensor.<name>_latest_weight`                  | kg        | Most recent weight entry                   |
+| `sensor.<name>_latest_height`                  | cm        | Most recent height entry                   |
+| `sensor.<name>_latest_head_circumference`      | cm        | Most recent head circumference entry       |
+| `sensor.<name>_latest_bmi`                     | kg/m²     | Most recent BMI entry                      |
+| `sensor.<name>_active_timer_duration`          | seconds   | Elapsed time of a running timer (0 while idle) |
+| `binary_sensor.<name>_active_timer`            | on/off    | On while a timer is running for this child |
 
-Polls BabyTracker every 60 seconds.
+Per backup destination, a second device is created with:
+
+| Entity                                 | Type      | Description                                     |
+| -------------------------------------- | --------- | ----------------------------------------------- |
+| `sensor.backup_<name>_last_successful` | timestamp | Most recent successful backup to this destination |
+| `sensor.backup_<name>_backup_count`    | count     | Number of archives currently stored there        |
+
+Useful for alerting when backups stop reaching a remote destination (e.g.
+"notify me if the Nextcloud backup is more than 48 hours old").
+
+Polls BabyTracker every 60 seconds. Credentials can be updated later via
+**Settings → Devices & Services → BabyTracker → Configure** without
+re-adding the integration.
 
 ## Installation
 
@@ -119,6 +140,12 @@ when omitted.
 | `babytracker.stop_timer`      | Stop a timer for a child (by name, optional)  |
 | `babytracker.set_slideshow`   | Start/stop the picture frame slideshow        |
 | `babytracker.refresh`         | Force-refresh the integration's sensor data   |
+
+### Backups
+
+| Service                       | What it does                                  |
+| ----------------------------- | --------------------------------------------- |
+| `babytracker.create_backup`   | Trigger an on-demand backup to every enabled destination (or a specific subset via the `destinations` field) |
 
 All write services need a **Read & Write** API token and trigger an
 immediate sensor refresh after the call succeeds.

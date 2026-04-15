@@ -42,6 +42,21 @@ class ChildSnapshot:
     diapers_wet_today: int = 0
     diapers_solid_today: int = 0
     active_timer: dict | None = None
+    # Latest growth measurements — None when the child has no entry yet.
+    latest_weight: dict | None = None
+    latest_height: dict | None = None
+    latest_head_circumference: dict | None = None
+    latest_bmi: dict | None = None
+
+
+@dataclass
+class BackupStatus:
+    """Per-destination backup health. Populated from the latest backups list
+    query; `last_success` is the newest backup that reached the destination."""
+
+    destination: dict
+    last_success: datetime | None = None
+    total_backups: int = 0
 
 
 @dataclass
@@ -50,6 +65,7 @@ class BabyTrackerData:
 
     children: list[dict] = field(default_factory=list)
     snapshots: dict[int, ChildSnapshot] = field(default_factory=dict)
+    backup_status: dict[int, BackupStatus] = field(default_factory=dict)
 
 
 def _start_of_today_utc() -> datetime:
@@ -110,6 +126,10 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 changes = await self.client.list_changes(cid, limit=100)
                 temps = await self.client.list_temperature(cid, limit=1)
                 meds = await self.client.list_medications(cid, limit=1)
+                weights = await self.client.list_weight(cid, limit=1)
+                heights = await self.client.list_height(cid, limit=1)
+                head_circs = await self.client.list_head_circumference(cid, limit=1)
+                bmis = await self.client.list_bmi(cid, limit=1)
 
                 snap = ChildSnapshot(child=child)
                 snap.last_feeding = feedings[0] if feedings else None
@@ -117,6 +137,10 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 snap.last_diaper = changes[0] if changes else None
                 snap.last_temperature = temps[0] if temps else None
                 snap.last_medication = meds[0] if meds else None
+                snap.latest_weight = weights[0] if weights else None
+                snap.latest_height = heights[0] if heights else None
+                snap.latest_head_circumference = head_circs[0] if head_circs else None
+                snap.latest_bmi = bmis[0] if bmis else None
 
                 for f in feedings:
                     start = _parse_iso(f.get("start"))
@@ -175,11 +199,57 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             self._seen_timers = current_timer_ids
             self._first_refresh_done = True
 
-            return BabyTrackerData(children=children, snapshots=snapshots)
+            backup_status = await self._collect_backup_status()
+            return BabyTrackerData(
+                children=children,
+                snapshots=snapshots,
+                backup_status=backup_status,
+            )
         except AuthError as err:
             raise UpdateFailed(f"authentication error: {err}") from err
         except BabyTrackerError as err:
             raise UpdateFailed(str(err)) from err
+
+    async def _collect_backup_status(self) -> dict[int, BackupStatus]:
+        """Query the backup list and derive per-destination health.
+
+        Tolerant of failures: the backup endpoints are admin-only and the user
+        might have scoped their API token to a non-admin user, in which case
+        the calls 403 — we just return an empty map and the sensors stay
+        unavailable rather than crashing the whole coordinator.
+        """
+        try:
+            destinations = await self.client.list_backup_destinations()
+            backups = await self.client.list_backups()
+        except BabyTrackerError as err:
+            _LOGGER.debug("backup status fetch skipped: %s", err)
+            return {}
+
+        # One BackupStatus per destination; key by ID so sensor unique_ids
+        # stay stable even if the destination is renamed.
+        status: dict[int, BackupStatus] = {}
+        for d in destinations:
+            status[d["id"]] = BackupStatus(destination=d)
+
+        # Walk the deduped backup list — each entry carries the destinations
+        # that hold a copy. The "date" field is formatted by the backend as
+        # YYYY-MM-DD HH:MM:SS in local time of the server. Not ideal for
+        # timezone correctness but good enough for "last backup ran at X".
+        for entry in backups:
+            date_str = entry.get("date", "")
+            when: datetime | None = None
+            try:
+                when = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                pass
+            for dref in entry.get("destinations", []) or []:
+                did = dref.get("id")
+                if did not in status:
+                    continue
+                status[did].total_backups += 1
+                if when and (status[did].last_success is None or when > status[did].last_success):
+                    status[did].last_success = when
+        return status
 
     def _emit_new_entries(
         self,

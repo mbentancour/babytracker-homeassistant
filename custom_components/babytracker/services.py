@@ -27,7 +27,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 
 from .api import BabyTrackerError
-from .const import DOMAIN
+from .const import DOMAIN, SERVICE_CREATE_BACKUP
 from .coordinator import BabyTrackerCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -232,6 +232,15 @@ SCHEMA_SET_SLIDESHOW = vol.Schema({
 })
 
 SCHEMA_REFRESH = vol.Schema({})
+
+# `destinations` is optional — if omitted the backend writes the archive to
+# every enabled destination (matches what happens when the server's cron
+# fires). Encrypted destinations without a stored passphrase are skipped
+# server-side with a warning; this service doesn't ask for passphrases to
+# keep the UX simple.
+SCHEMA_CREATE_BACKUP = vol.Schema({
+    vol.Optional("destinations"): vol.All(cv.ensure_list, [int]),
+})
 
 
 # ----------------------------------------------------------------------------
@@ -461,6 +470,37 @@ async def _refresh(call: ServiceCall) -> None:
     await coord.async_request_refresh()
 
 
+async def _create_backup(call: ServiceCall) -> None:
+    """Trigger an on-demand backup.
+
+    The backend returns per-destination results; we don't surface them here
+    because HA services don't expose structured responses well — operators who
+    want results inspection can poll the backup_count / backup_last_success
+    sensors after the call, or watch the logbook.
+    """
+    coord = _coordinator(call.hass)
+    destinations = call.data.get("destinations")
+    try:
+        result = await coord.client.create_backup(destinations)
+    except BabyTrackerError as err:
+        raise HomeAssistantError(f"Backup failed: {err}") from err
+
+    # Surface per-destination failures in the HA log so they don't silently
+    # vanish. A single failed destination doesn't fail the whole call — the
+    # backend reports each one independently.
+    for entry in result.get("results", []) or []:
+        if entry.get("error"):
+            _LOGGER.warning(
+                "Backup to %s failed: %s",
+                entry.get("destination") or entry.get("destination_id"),
+                entry["error"],
+            )
+
+    # Kick a coordinator refresh so the backup_last_success sensor updates
+    # without waiting for the next scheduled poll.
+    await coord.async_request_refresh()
+
+
 _SERVICES = (
     (SERVICE_LOG_FEEDING, _log_feeding, SCHEMA_LOG_FEEDING),
     (SERVICE_LOG_SLEEP, _log_sleep, SCHEMA_LOG_SLEEP),
@@ -478,6 +518,7 @@ _SERVICES = (
     (SERVICE_STOP_TIMER, _stop_timer, SCHEMA_STOP_TIMER),
     (SERVICE_SET_SLIDESHOW, _set_slideshow, SCHEMA_SET_SLIDESHOW),
     (SERVICE_REFRESH, _refresh, SCHEMA_REFRESH),
+    (SERVICE_CREATE_BACKUP, _create_backup, SCHEMA_CREATE_BACKUP),
 )
 
 

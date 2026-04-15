@@ -369,3 +369,21 @@ set_slideshow:
 refresh:
   name: Refresh
   description: Force the integration to immediately refresh sensor data from BabyTracker.
+
+create_backup:
+  name: Create backup
+  description: >-
+    Trigger a one-off BabyTracker backup. The archive is uploaded to every
+    enabled destination, or only to the destinations you list. Encrypted
+    destinations without a stored passphrase are skipped silently — use the
+    BabyTracker UI for those.
+  fields:
+    destinations:
+      name: Destination IDs
+      description: >-
+        Optional list of destination IDs. Leave empty to target every enabled
+        destination. Destination IDs can be seen in the BabyTracker Settings
+        UI (or in the ID of each `backup_*` sensor device).
+      example: "[1, 2]"
+      selector:
+        object:

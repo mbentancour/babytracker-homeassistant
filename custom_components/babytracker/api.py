@@ -109,6 +109,52 @@ class BabyTrackerClient:
     async def get_config(self) -> dict:
         return await self._request("GET", "/api/config")
 
+    # Growth — used for the latest_* sensors. Limit=1 because we only need the
+    # most recent reading per child per metric.
+    async def list_weight(self, child_id: int, limit: int = 1) -> list[dict]:
+        data = await self._request(
+            "GET", "/api/weight/",
+            params={"child": child_id, "limit": limit, "ordering": "-date"},
+        )
+        return data.get("results", [])
+
+    async def list_height(self, child_id: int, limit: int = 1) -> list[dict]:
+        data = await self._request(
+            "GET", "/api/height/",
+            params={"child": child_id, "limit": limit, "ordering": "-date"},
+        )
+        return data.get("results", [])
+
+    async def list_head_circumference(self, child_id: int, limit: int = 1) -> list[dict]:
+        data = await self._request(
+            "GET", "/api/head-circumference/",
+            params={"child": child_id, "limit": limit, "ordering": "-date"},
+        )
+        return data.get("results", [])
+
+    async def list_bmi(self, child_id: int, limit: int = 1) -> list[dict]:
+        data = await self._request(
+            "GET", "/api/bmi/",
+            params={"child": child_id, "limit": limit, "ordering": "-date"},
+        )
+        return data.get("results", [])
+
+    # Backup introspection — drives the "last successful backup" sensors and
+    # the create_backup service acknowledgement.
+    async def list_backups(self) -> list[dict]:
+        data = await self._request("GET", "/api/backups/")
+        return data.get("results", [])
+
+    async def list_backup_destinations(self) -> list[dict]:
+        data = await self._request("GET", "/api/backups/destinations")
+        return data.get("results", [])
+
+    async def create_backup(self, destination_ids: list[int] | None = None) -> dict:
+        payload: dict[str, Any] = {}
+        if destination_ids:
+            payload["destination_ids"] = destination_ids
+        return await self._request("POST", "/api/backups/", json=payload)
+
     # ---- write methods ----
 
     async def create_feeding(self, payload: dict) -> dict:
