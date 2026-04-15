@@ -12,6 +12,7 @@ from .api import BabyTrackerClient
 from .const import CONF_TOKEN, CONF_URL, CONF_VERIFY_SSL, DOMAIN
 from .coordinator import BabyTrackerCoordinator
 from .services import async_register_services
+from .webhook import async_register_webhook, async_unregister_webhook
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
@@ -33,11 +34,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await async_register_services(hass)
+
+    # Register an HA webhook and subscribe BabyTracker to it so activity
+    # events push here within a second instead of waiting up to 10 minutes
+    # for the next poll. Non-fatal: if the registration fails we keep running
+    # on polling-only mode.
+    await async_register_webhook(hass, entry, coordinator)
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    await async_unregister_webhook(hass, entry, coordinator)
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id, None)

@@ -8,8 +8,13 @@ CONF_URL = "url"
 CONF_TOKEN = "token"
 CONF_VERIFY_SSL = "verify_ssl"
 
-# Polling interval — BabyTracker is local, fast, and tracks slow-changing data.
-DEFAULT_SCAN_INTERVAL = timedelta(seconds=60)
+# Polling interval — BabyTracker pushes activity events via webhook, so the
+# poll is only a safety net for (a) missed pushes, (b) derived sensors like
+# "hours since last feeding" that need periodic recalculation, and (c) the
+# today-totals rollover at midnight. Ten minutes is generous for all three.
+# If webhook registration fails at setup, polling at this rate is what keeps
+# the integration functional — still usable, just with up to 10-min lag.
+DEFAULT_SCAN_INTERVAL = timedelta(minutes=10)
 
 # Event names fired on the HA event bus when BabyTracker activity is detected
 EVENT_NEW_FEEDING = "babytracker_new_feeding"

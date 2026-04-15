@@ -44,9 +44,15 @@ Per backup destination, a second device is created with:
 Useful for alerting when backups stop reaching a remote destination (e.g.
 "notify me if the Nextcloud backup is more than 48 hours old").
 
-Polls BabyTracker every 60 seconds. Credentials can be updated later via
-**Settings → Devices & Services → BabyTracker → Configure** without
-re-adding the integration.
+**Push updates via webhook.** On setup the integration registers an HA
+webhook with BabyTracker; new activity events (feeding, sleep, diaper, etc.)
+arrive within a second, HMAC-SHA256 signed so the payload can be trusted.
+The coordinator still polls every 10 minutes as a safety net — for missed
+deliveries, today-totals rollover at midnight, and "hours since last…"
+sensors that drift by the minute.
+
+Credentials can be updated later via **Settings → Devices & Services →
+BabyTracker → Configure** without re-adding the integration.
 
 ## Installation
 

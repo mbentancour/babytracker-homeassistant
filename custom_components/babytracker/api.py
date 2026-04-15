@@ -155,6 +155,22 @@ class BabyTrackerClient:
             payload["destination_ids"] = destination_ids
         return await self._request("POST", "/api/backups/", json=payload)
 
+    # Webhook management — used by the integration's setup/unload to register
+    # an HA webhook with BabyTracker so activity events are pushed instead of
+    # polled. The secret must be ≥16 chars (backend enforces this).
+    async def create_webhook(self, name: str, url: str, secret: str,
+                             events: str = "*") -> dict:
+        return await self._request("POST", "/api/webhooks/", json={
+            "name": name,
+            "url": url,
+            "secret": secret,
+            "events": events,
+            "active": True,
+        })
+
+    async def delete_webhook(self, webhook_id: int) -> None:
+        await self._request("DELETE", f"/api/webhooks/{webhook_id}/")
+
     # ---- write methods ----
 
     async def create_feeding(self, payload: dict) -> dict:
