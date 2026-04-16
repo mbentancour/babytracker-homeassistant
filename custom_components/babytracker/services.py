@@ -175,8 +175,11 @@ SCHEMA_LOG_SLEEP = _base_schema({
 })
 
 SCHEMA_LOG_DIAPER = _base_schema({
-    vol.Optional("wet", default=True): cv.boolean,
-    vol.Optional("solid", default=False): cv.boolean,
+    # `type` collapses "is it wet / solid / both?" into a single choice —
+    # matches Baby Buddy's UX and avoids the two-boolean ambiguity (and the
+    # awkward "color field that's only meaningful when solid is checked"
+    # problem that services.yaml can't express with a conditional selector).
+    vol.Optional("type", default="wet"): vol.In(("wet", "solid", "both")),
     vol.Optional("color", default=""): vol.In(DIAPER_COLORS),
     vol.Optional("when"): cv.datetime,
 })
@@ -287,7 +290,7 @@ async def _do_create(call: ServiceCall, fn_name: str, payload: dict) -> None:
     # integration actually do?" debugging loop.
     _LOGGER.debug("calling %s with payload=%s", fn_name, payload)
     try:
-        await fn(payload)
+        result = await fn(payload)
     except BabyTrackerError as err:
         # Include the payload in the user-visible error. HA's UI truncates
         # long messages but shows the full thing in the logbook entry, which
@@ -295,7 +298,12 @@ async def _do_create(call: ServiceCall, fn_name: str, payload: dict) -> None:
         raise HomeAssistantError(
             f"BabyTracker {fn_name} failed: {err} — payload sent: {payload}"
         ) from err
-    await coord.async_request_refresh()
+    _LOGGER.debug("%s response: %s", fn_name, result)
+    # Use async_refresh (not async_request_refresh) so the sensor values
+    # update immediately after the service call. async_request_refresh is
+    # debounced; with our 10-minute poll interval it can delay visible
+    # updates long enough that users think the action didn't work.
+    await coord.async_refresh()
 
 
 async def _log_feeding(call: ServiceCall) -> None:
@@ -327,12 +335,16 @@ async def _log_sleep(call: ServiceCall) -> None:
 async def _log_diaper(call: ServiceCall) -> None:
     cid = _resolve_child_id(call.hass, call.data["device_id"])
     when = call.data.get("when") or datetime.now()
+    dtype = call.data.get("type", "wet")
     payload = {
         "child": cid,
         "time": _local_iso(when),
-        "wet": call.data.get("wet", True),
-        "solid": call.data.get("solid", False),
-        "color": call.data.get("color", ""),
+        "wet": dtype in ("wet", "both"),
+        "solid": dtype in ("solid", "both"),
+        # Color only makes sense for solid-containing changes; silently
+        # drop it otherwise so a stale dashboard default doesn't pollute
+        # the entry.
+        "color": call.data.get("color", "") if dtype in ("solid", "both") else "",
         "notes": call.data.get("notes", ""),
     }
     await _do_create(call, "create_diaper", payload)

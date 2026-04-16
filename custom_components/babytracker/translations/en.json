@@ -184,15 +184,13 @@
         "device_id": {
           "name": "Child"
         },
-        "wet": {
-          "name": "Wet"
-        },
-        "solid": {
-          "name": "Solid"
+        "type": {
+          "name": "Type",
+          "description": "What kind of diaper change."
         },
         "color": {
           "name": "Color",
-          "description": "Color of stool, if relevant."
+          "description": "Color of stool. Only meaningful when the type includes solid."
         },
         "when": {
           "name": "When",

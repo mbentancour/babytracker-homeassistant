@@ -96,25 +96,28 @@ log_diaper:
         device:
           integration: babytracker
           model: Child
-    wet:
-      name: Wet
-      default: true
-      selector: { boolean: {} }
-    solid:
-      name: Solid
-      default: false
-      selector: { boolean: {} }
+    type:
+      name: Type
+      description: What kind of diaper change.
+      default: wet
+      required: true
+      selector:
+        select:
+          options:
+            - { value: wet, label: "Wet" }
+            - { value: solid, label: "Solid" }
+            - { value: both, label: "Wet and solid" }
     color:
       name: Color
-      description: Color of stool, if relevant.
+      description: Color of stool. Only meaningful when the type includes solid.
       selector:
         select:
           options:
             - { value: "", label: "(none)" }
-            - { value: "black", label: "Black" }
-            - { value: "brown", label: "Brown" }
-            - { value: "green", label: "Green" }
-            - { value: "yellow", label: "Yellow" }
+            - { value: black, label: "Black" }
+            - { value: brown, label: "Brown" }
+            - { value: green, label: "Green" }
+            - { value: yellow, label: "Yellow" }
     when:
       name: When
       description: When the change happened. Defaults to now.
