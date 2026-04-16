@@ -74,6 +74,7 @@ log_sleep:
     nap:
       name: Nap
       description: Daytime nap (otherwise nighttime sleep).
+      required: true
       default: true
       selector: { boolean: {} }
     ended_at:
@@ -98,10 +99,16 @@ log_diaper:
           model: Child
     wet:
       name: Wet
+      # Marking booleans `required: true` is the only way to get HA to render
+      # them as a direct switch. Optional booleans render as an "enable this
+      # field" checkbox plus a nested switch — two controls for one choice,
+      # which looks broken even though it isn't.
+      required: true
       default: true
       selector: { boolean: {} }
     solid:
       name: Solid
+      required: true
       default: false
       selector: { boolean: {} }
     color:
