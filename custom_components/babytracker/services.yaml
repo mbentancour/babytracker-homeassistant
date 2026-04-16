@@ -42,8 +42,7 @@ log_feeding:
         number: { mode: box, min: 0, max: 500, step: 1, unit_of_measurement: "mL" }
     duration_minutes:
       name: Duration
-      description: How long the feeding lasted.
-      default: 0
+      description: How long the feeding lasted. Leave empty for an instant event.
       selector:
         number: { mode: box, min: 0, max: 240, step: 1, unit_of_measurement: "min" }
     ended_at:
@@ -87,7 +86,8 @@ log_sleep:
 
 log_diaper:
   name: Log diaper change
-  description: Record a diaper change for a child.
+  description: Record a diaper change for a child. Tick at least one of Wet
+    or Solid — you can tick both for a combined change.
   fields:
     device_id:
       name: Child
@@ -96,20 +96,17 @@ log_diaper:
         device:
           integration: babytracker
           model: Child
-    type:
-      name: Type
-      description: What kind of diaper change.
-      default: wet
-      required: true
-      selector:
-        select:
-          options:
-            - { value: wet, label: "Wet" }
-            - { value: solid, label: "Solid" }
-            - { value: both, label: "Wet and solid" }
+    wet:
+      name: Wet
+      default: true
+      selector: { boolean: {} }
+    solid:
+      name: Solid
+      default: false
+      selector: { boolean: {} }
     color:
       name: Color
-      description: Color of stool. Only meaningful when the type includes solid.
+      description: Color of stool. Only applied when Solid is ticked — ignored otherwise.
       selector:
         select:
           options:
@@ -145,9 +142,10 @@ log_tummy_time:
     ended_at:
       name: Ended at
       selector: { datetime: {} }
-    milestone:
-      name: Milestone
-      description: Anything notable that happened.
+    highlight:
+      name: Highlight
+      description: A short one-liner about anything notable during this session. Not the same as logging a developmental milestone — use "Log milestone" for those.
+      example: "First time lifting head"
       selector: { text: {} }
     notes:
       name: Notes
@@ -164,18 +162,21 @@ log_pumping:
         device:
           integration: babytracker
           model: Child
-    duration_minutes:
-      name: Duration
-      required: true
-      selector:
-        number: { mode: box, min: 1, max: 240, step: 1, unit_of_measurement: "min" }
     amount:
       name: Amount
-      description: Amount pumped in mL.
+      description: How much was pumped, in mL.
+      required: true
+      example: 120
       selector:
         number: { mode: box, min: 0, max: 500, step: 1, unit_of_measurement: "mL" }
+    duration_minutes:
+      name: Duration
+      description: How long the session lasted. Optional.
+      selector:
+        number: { mode: box, min: 1, max: 240, step: 1, unit_of_measurement: "min" }
     ended_at:
       name: Ended at
+      description: When the session ended. Defaults to now if omitted.
       selector: { datetime: {} }
     notes:
       name: Notes
@@ -194,12 +195,13 @@ log_temperature:
           model: Child
     temperature:
       name: Temperature
-      description: Reading in your configured unit (°C or °F).
+      description: Reading value. Units follow your BabyTracker setting (°C or °F). The range below covers both.
       required: true
       example: 37.2
       selector: { number: { mode: box, min: 30, max: 110, step: 0.1 } }
     when:
       name: When
+      description: When the reading was taken. Defaults to now.
       selector: { datetime: {} }
     notes:
       name: Notes
@@ -290,8 +292,9 @@ log_milestone:
             - "social"
             - "language"
             - "other"
-    description:
-      name: Description
+    details:
+      name: Details
+      description: Longer description. Optional.
       selector: { text: { multiline: true } }
     date:
       name: Date
@@ -311,13 +314,17 @@ log_weight:
           model: Child
     weight:
       name: Weight
-      description: Weight in your configured unit (kg or lb).
+      description: Value in your configured unit (kg or lb).
       required: true
       example: 4.2
-      selector: { number: { mode: box, min: 0, max: 100, step: 0.01 } }
+      selector: { number: { mode: box, min: 0, max: 200, step: 0.01 } }
     date:
       name: Date
+      description: When the measurement was taken. Defaults to today.
       selector: { date: {} }
+    notes:
+      name: Notes
+      selector: { text: { multiline: true } }
 
 log_height:
   name: Log height
@@ -332,13 +339,17 @@ log_height:
           model: Child
     height:
       name: Height
-      description: Height in your configured unit (cm or in).
+      description: Value in your configured unit (cm or in).
       required: true
       example: 55
       selector: { number: { mode: box, min: 0, max: 250, step: 0.1 } }
     date:
       name: Date
+      description: When the measurement was taken. Defaults to today.
       selector: { date: {} }
+    notes:
+      name: Notes
+      selector: { text: { multiline: true } }
 
 log_head_circumference:
   name: Log head circumference
@@ -353,12 +364,17 @@ log_head_circumference:
           model: Child
     head_circumference:
       name: Head circumference
+      description: Value in your configured unit (cm or in).
       required: true
       example: 35.5
       selector: { number: { mode: box, min: 0, max: 80, step: 0.1 } }
     date:
       name: Date
+      description: When the measurement was taken. Defaults to today.
       selector: { date: {} }
+    notes:
+      name: Notes
+      selector: { text: { multiline: true } }
 
 start_timer:
   name: Start timer

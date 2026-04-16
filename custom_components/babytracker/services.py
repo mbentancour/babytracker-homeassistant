@@ -175,11 +175,8 @@ SCHEMA_LOG_SLEEP = _base_schema({
 })
 
 SCHEMA_LOG_DIAPER = _base_schema({
-    # `type` collapses "is it wet / solid / both?" into a single choice —
-    # matches Baby Buddy's UX and avoids the two-boolean ambiguity (and the
-    # awkward "color field that's only meaningful when solid is checked"
-    # problem that services.yaml can't express with a conditional selector).
-    vol.Optional("type", default="wet"): vol.In(("wet", "solid", "both")),
+    vol.Optional("wet", default=True): cv.boolean,
+    vol.Optional("solid", default=False): cv.boolean,
     vol.Optional("color", default=""): vol.In(DIAPER_COLORS),
     vol.Optional("when"): cv.datetime,
 })
@@ -188,15 +185,17 @@ SCHEMA_LOG_TUMMY_TIME = _base_schema({
     vol.Required("duration_minutes"): vol.All(
         vol.Coerce(int), vol.Range(min=1, max=240)
     ),
-    vol.Optional("milestone", default=""): cv.string,
+    # Renamed from `milestone` — a previous version of the schema shared that
+    # name with the separate log_milestone service, which confused users.
+    vol.Optional("highlight", default=""): cv.string,
     vol.Optional("ended_at"): cv.datetime,
 })
 
 SCHEMA_LOG_PUMPING = _base_schema({
-    vol.Required("duration_minutes"): vol.All(
+    vol.Required("amount"): vol.Coerce(float),
+    vol.Optional("duration_minutes"): vol.All(
         vol.Coerce(int), vol.Range(min=1, max=240)
     ),
-    vol.Optional("amount"): vol.Coerce(float),
     vol.Optional("ended_at"): cv.datetime,
 })
 
@@ -220,7 +219,9 @@ SCHEMA_LOG_NOTE = _base_schema({
 SCHEMA_LOG_MILESTONE = _base_schema({
     vol.Required("title"): cv.string,
     vol.Optional("category", default="other"): vol.In(MILESTONE_CATEGORIES),
-    vol.Optional("description", default=""): cv.string,
+    # Renamed from `description` — avoids a naming clash with every service's
+    # top-level `description` in strings.json.
+    vol.Optional("details", default=""): cv.string,
     vol.Optional("date"): cv.date,
 })
 
@@ -334,17 +335,21 @@ async def _log_sleep(call: ServiceCall) -> None:
 
 async def _log_diaper(call: ServiceCall) -> None:
     cid = _resolve_child_id(call.hass, call.data["device_id"])
+    wet = call.data.get("wet", True)
+    solid = call.data.get("solid", False)
+    if not wet and not solid:
+        raise ServiceValidationError(
+            "At least one of Wet or Solid must be ticked."
+        )
     when = call.data.get("when") or datetime.now()
-    dtype = call.data.get("type", "wet")
     payload = {
         "child": cid,
         "time": _local_iso(when),
-        "wet": dtype in ("wet", "both"),
-        "solid": dtype in ("solid", "both"),
-        # Color only makes sense for solid-containing changes; silently
-        # drop it otherwise so a stale dashboard default doesn't pollute
-        # the entry.
-        "color": call.data.get("color", "") if dtype in ("solid", "both") else "",
+        "wet": wet,
+        "solid": solid,
+        # Color only applies to solid-containing changes; drop any stale
+        # default the user left from a previous wet-only call.
+        "color": call.data.get("color", "") if solid else "",
         "notes": call.data.get("notes", ""),
     }
     await _do_create(call, "create_diaper", payload)
@@ -353,7 +358,9 @@ async def _log_diaper(call: ServiceCall) -> None:
 async def _log_tummy_time(call: ServiceCall) -> None:
     cid = _resolve_child_id(call.hass, call.data["device_id"])
     payload = _build_duration_payload(call, cid)
-    payload["milestone"] = call.data.get("milestone", "")
+    # Backend field is still called `milestone` — the rename is HA-side only
+    # to disambiguate from the separate log_milestone service.
+    payload["milestone"] = call.data.get("highlight", "")
     payload["notes"] = call.data.get("notes", "")
     await _do_create(call, "create_tummy_time", payload)
 
@@ -411,7 +418,8 @@ async def _log_milestone(call: ServiceCall) -> None:
         "date": _date_iso(call.data.get("date")),
         "title": call.data["title"],
         "category": call.data.get("category", "other"),
-        "description": call.data.get("description", ""),
+        # UI field is "details", backend stores it as "description".
+        "description": call.data.get("details", ""),
     }
     await _do_create(call, "create_milestone", payload)
 

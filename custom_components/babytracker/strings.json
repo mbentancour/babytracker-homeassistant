@@ -142,7 +142,7 @@
         },
         "duration_minutes": {
           "name": "Duration",
-          "description": "How long the feeding lasted."
+          "description": "How long the feeding lasted. Leave empty for an instant event."
         },
         "ended_at": {
           "name": "Ended at",
@@ -179,18 +179,20 @@
     },
     "log_diaper": {
       "name": "Log diaper change",
-      "description": "Record a diaper change for a child.",
+      "description": "Record a diaper change for a child. Tick at least one of Wet or Solid — you can tick both for a combined change.",
       "fields": {
         "device_id": {
           "name": "Child"
         },
-        "type": {
-          "name": "Type",
-          "description": "What kind of diaper change."
+        "wet": {
+          "name": "Wet"
+        },
+        "solid": {
+          "name": "Solid"
         },
         "color": {
           "name": "Color",
-          "description": "Color of stool. Only meaningful when the type includes solid."
+          "description": "Color of stool. Only applied when Solid is ticked — ignored otherwise."
         },
         "when": {
           "name": "When",
@@ -214,9 +216,9 @@
         "ended_at": {
           "name": "Ended at"
         },
-        "milestone": {
-          "name": "Milestone",
-          "description": "Anything notable that happened."
+        "highlight": {
+          "name": "Highlight",
+          "description": "A short one-liner about anything notable during this session. Not the same as logging a developmental milestone — use \"Log milestone\" for those."
         },
         "notes": {
           "name": "Notes"
@@ -230,15 +232,17 @@
         "device_id": {
           "name": "Child"
         },
-        "duration_minutes": {
-          "name": "Duration"
-        },
         "amount": {
           "name": "Amount",
-          "description": "Amount pumped in mL."
+          "description": "How much was pumped, in mL."
+        },
+        "duration_minutes": {
+          "name": "Duration",
+          "description": "How long the session lasted. Optional."
         },
         "ended_at": {
-          "name": "Ended at"
+          "name": "Ended at",
+          "description": "When the session ended. Defaults to now if omitted."
         },
         "notes": {
           "name": "Notes"
@@ -254,10 +258,11 @@
         },
         "temperature": {
           "name": "Temperature",
-          "description": "Reading in your configured unit (°C or °F)."
+          "description": "Reading value. Units follow your BabyTracker setting (°C or °F). The range below covers both."
         },
         "when": {
-          "name": "When"
+          "name": "When",
+          "description": "When the reading was taken. Defaults to now."
         },
         "notes": {
           "name": "Notes"
@@ -316,8 +321,9 @@
         "category": {
           "name": "Category"
         },
-        "description": {
-          "name": "Description"
+        "details": {
+          "name": "Details",
+          "description": "Longer description. Optional."
         },
         "date": {
           "name": "Date",
@@ -334,10 +340,14 @@
         },
         "weight": {
           "name": "Weight",
-          "description": "Weight in your configured unit (kg or lb)."
+          "description": "Value in your configured unit (kg or lb)."
         },
         "date": {
-          "name": "Date"
+          "name": "Date",
+          "description": "When the measurement was taken. Defaults to today."
+        },
+        "notes": {
+          "name": "Notes"
         }
       }
     },
@@ -350,10 +360,14 @@
         },
         "height": {
           "name": "Height",
-          "description": "Height in your configured unit (cm or in)."
+          "description": "Value in your configured unit (cm or in)."
         },
         "date": {
-          "name": "Date"
+          "name": "Date",
+          "description": "When the measurement was taken. Defaults to today."
+        },
+        "notes": {
+          "name": "Notes"
         }
       }
     },
@@ -365,10 +379,15 @@
           "name": "Child"
         },
         "head_circumference": {
-          "name": "Head circumference"
+          "name": "Head circumference",
+          "description": "Value in your configured unit (cm or in)."
         },
         "date": {
-          "name": "Date"
+          "name": "Date",
+          "description": "When the measurement was taken. Defaults to today."
+        },
+        "notes": {
+          "name": "Notes"
         }
       }
     },
