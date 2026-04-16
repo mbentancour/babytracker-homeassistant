@@ -175,8 +175,12 @@ SCHEMA_LOG_SLEEP = _base_schema({
 })
 
 SCHEMA_LOG_DIAPER = _base_schema({
-    vol.Optional("wet", default=True): cv.boolean,
-    vol.Optional("solid", default=False): cv.boolean,
+    # `type` is a multi-select — the list can contain "wet", "solid", or both.
+    # Renders as checkboxes in the HA form. Required=True with a default
+    # means the user sees "Wet" pre-ticked and can add "Solid" with one click.
+    vol.Required("type", default=["wet"]): vol.All(
+        cv.ensure_list, [vol.In(("wet", "solid"))],
+    ),
     vol.Optional("color", default=""): vol.In(DIAPER_COLORS),
     vol.Optional("when"): cv.datetime,
 })
@@ -335,11 +339,14 @@ async def _log_sleep(call: ServiceCall) -> None:
 
 async def _log_diaper(call: ServiceCall) -> None:
     cid = _resolve_child_id(call.hass, call.data["device_id"])
-    wet = call.data.get("wet", True)
-    solid = call.data.get("solid", False)
+    # type arrives as a list of strings — `cv.ensure_list` accepts a single
+    # string too, which covers users calling via YAML with `type: wet`.
+    types = set(call.data.get("type") or [])
+    wet = "wet" in types
+    solid = "solid" in types
     if not wet and not solid:
         raise ServiceValidationError(
-            "At least one of Wet or Solid must be ticked."
+            "Tick at least one of Wet or Solid."
         )
     when = call.data.get("when") or datetime.now()
     payload = {

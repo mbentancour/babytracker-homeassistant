@@ -179,16 +179,14 @@
     },
     "log_diaper": {
       "name": "Log diaper change",
-      "description": "Record a diaper change for a child. Tick at least one of Wet or Solid — you can tick both for a combined change.",
+      "description": "Record a diaper change for a child.",
       "fields": {
         "device_id": {
           "name": "Child"
         },
-        "wet": {
-          "name": "Wet"
-        },
-        "solid": {
-          "name": "Solid"
+        "type": {
+          "name": "Type",
+          "description": "Tick at least one."
         },
         "color": {
           "name": "Color",

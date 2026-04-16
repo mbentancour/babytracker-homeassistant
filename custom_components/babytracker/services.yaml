@@ -87,8 +87,7 @@ log_sleep:
 
 log_diaper:
   name: Log diaper change
-  description: Record a diaper change for a child. Tick at least one of Wet
-    or Solid — you can tick both for a combined change.
+  description: Record a diaper change for a child.
   fields:
     device_id:
       name: Child
@@ -97,20 +96,22 @@ log_diaper:
         device:
           integration: babytracker
           model: Child
-    wet:
-      name: Wet
-      # Marking booleans `required: true` is the only way to get HA to render
-      # them as a direct switch. Optional booleans render as an "enable this
-      # field" checkbox plus a nested switch — two controls for one choice,
-      # which looks broken even though it isn't.
+    type:
+      name: Type
+      description: Tick at least one.
       required: true
-      default: true
-      selector: { boolean: {} }
-    solid:
-      name: Solid
-      required: true
-      default: false
-      selector: { boolean: {} }
+      default: ["wet"]
+      selector:
+        select:
+          # `mode: list` + `multiple: true` renders as a list of checkboxes —
+          # what you actually want for "is it wet? is it solid? maybe both?"
+          # Two separate boolean switches would work but HA's switch styling
+          # for booleans is a lot heavier than real checkboxes.
+          mode: list
+          multiple: true
+          options:
+            - { value: wet, label: "Wet" }
+            - { value: solid, label: "Solid" }
     color:
       name: Color
       description: Color of stool. Only applied when Solid is ticked — ignored otherwise.
