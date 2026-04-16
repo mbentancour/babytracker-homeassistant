@@ -171,6 +171,25 @@ class BabyTrackerClient:
     async def delete_webhook(self, webhook_id: int) -> None:
         await self._request("DELETE", f"/api/webhooks/{webhook_id}/")
 
+    # Tags — used by the log_* services to attach user-typed tag names to
+    # the entries they create. Tags are auto-created if a name doesn't
+    # exist yet (matches the behaviour of the BabyTracker web UI).
+    async def list_tags(self) -> list[dict]:
+        data = await self._request("GET", "/api/tags/")
+        return data.get("results", [])
+
+    async def create_tag(self, name: str, color: str = "#6C5CE7") -> dict:
+        return await self._request("POST", "/api/tags/", json={"name": name, "color": color})
+
+    async def set_entity_tags(
+        self, entity_type: str, entity_id: int, tag_ids: list[int]
+    ) -> None:
+        await self._request(
+            "PUT",
+            f"/api/tags/{entity_type}/{entity_id}/",
+            json={"tag_ids": tag_ids},
+        )
+
     # ---- write methods ----
 
     async def create_feeding(self, payload: dict) -> dict:

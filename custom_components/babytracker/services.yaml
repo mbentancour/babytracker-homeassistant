@@ -49,6 +49,12 @@ log_feeding:
       name: Ended at
       description: When the feeding ended. Defaults to now if omitted.
       selector: { datetime: {} }
+    tags:
+      name: Tags
+      description: Comma-separated list of tag names. New tags are created automatically with a default color; rename/recolor them in BabyTracker → Settings → Data → Tags.
+      example: "teething, fussy"
+      selector: { text: {} }
+
     notes:
       name: Notes
       selector: { text: { multiline: true } }
@@ -81,6 +87,11 @@ log_sleep:
       name: Ended at
       description: When the sleep ended. Defaults to now if omitted.
       selector: { datetime: {} }
+    tags:
+      name: Tags
+      description: Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags.
+      example: "teething, fussy"
+      selector: { text: {} }
     notes:
       name: Notes
       selector: { text: { multiline: true } }
@@ -127,6 +138,11 @@ log_diaper:
       name: When
       description: When the change happened. Defaults to now.
       selector: { datetime: {} }
+    tags:
+      name: Tags
+      description: Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags.
+      example: "teething, fussy"
+      selector: { text: {} }
     notes:
       name: Notes
       selector: { text: { multiline: true } }
@@ -154,6 +170,11 @@ log_tummy_time:
       name: Highlight
       description: A short one-liner about anything notable during this session. Not the same as logging a developmental milestone — use "Log milestone" for those.
       example: "First time lifting head"
+      selector: { text: {} }
+    tags:
+      name: Tags
+      description: Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags.
+      example: "teething, fussy"
       selector: { text: {} }
     notes:
       name: Notes
@@ -186,6 +207,11 @@ log_pumping:
       name: Ended at
       description: When the session ended. Defaults to now if omitted.
       selector: { datetime: {} }
+    tags:
+      name: Tags
+      description: Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags.
+      example: "teething, fussy"
+      selector: { text: {} }
     notes:
       name: Notes
       selector: { text: { multiline: true } }
@@ -211,6 +237,11 @@ log_temperature:
       name: When
       description: When the reading was taken. Defaults to now.
       selector: { datetime: {} }
+    tags:
+      name: Tags
+      description: Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags.
+      example: "teething, fussy"
+      selector: { text: {} }
     notes:
       name: Notes
       selector: { text: { multiline: true } }
@@ -250,6 +281,11 @@ log_medication:
     when:
       name: When
       selector: { datetime: {} }
+    tags:
+      name: Tags
+      description: Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags.
+      example: "teething, fussy"
+      selector: { text: {} }
     notes:
       name: Notes
       selector: { text: { multiline: true } }
@@ -269,6 +305,11 @@ log_note:
       name: Note
       required: true
       selector: { text: { multiline: true } }
+    tags:
+      name: Tags
+      description: Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags.
+      example: "teething, fussy"
+      selector: { text: {} }
     when:
       name: When
       selector: { datetime: {} }
@@ -304,6 +345,11 @@ log_milestone:
       name: Details
       description: Longer description. Optional.
       selector: { text: { multiline: true } }
+    tags:
+      name: Tags
+      description: Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags.
+      example: "teething, fussy"
+      selector: { text: {} }
     date:
       name: Date
       description: When the milestone was reached. Defaults to today.
@@ -330,6 +376,11 @@ log_weight:
       name: Date
       description: When the measurement was taken. Defaults to today.
       selector: { date: {} }
+    tags:
+      name: Tags
+      description: Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags.
+      example: "teething, fussy"
+      selector: { text: {} }
     notes:
       name: Notes
       selector: { text: { multiline: true } }
@@ -355,6 +406,11 @@ log_height:
       name: Date
       description: When the measurement was taken. Defaults to today.
       selector: { date: {} }
+    tags:
+      name: Tags
+      description: Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags.
+      example: "teething, fussy"
+      selector: { text: {} }
     notes:
       name: Notes
       selector: { text: { multiline: true } }
@@ -380,6 +436,11 @@ log_head_circumference:
       name: Date
       description: When the measurement was taken. Defaults to today.
       selector: { date: {} }
+    tags:
+      name: Tags
+      description: Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags.
+      example: "teething, fussy"
+      selector: { text: {} }
     notes:
       name: Notes
       selector: { text: { multiline: true } }

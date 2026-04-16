@@ -147,13 +147,62 @@ def _resolve_child_id(hass: HomeAssistant, device_id: str) -> int:
 
 
 def _base_schema(extra: dict) -> vol.Schema:
-    """Schema with device_id + optional notes, plus per-service extras."""
+    """Schema with device_id + optional notes + optional tags, plus per-service
+    extras. Tags come in as a free-text, comma-separated list of names; the
+    handler layer resolves them to IDs and auto-creates unknown names."""
     fields = {
         vol.Required("device_id"): cv.string,
         vol.Optional("notes", default=""): cv.string,
+        vol.Optional("tags", default=""): cv.string,
     }
     fields.update(extra)
     return vol.Schema(fields)
+
+
+async def _resolve_and_attach_tags(
+    coord: BabyTrackerCoordinator,
+    entity_type: str,
+    entity_id: int | None,
+    tags_str: str,
+) -> None:
+    """Resolve a comma-separated list of tag names to IDs (creating any that
+    don't exist yet) and attach them to the freshly-created entry.
+
+    Auto-create uses a neutral default color; users can recolor/rename in
+    the BabyTracker UI afterwards. Failures are logged at warning and do
+    not propagate — the entry itself already exists and is the important
+    bit; tagging is best-effort.
+    """
+    if not entity_id or not tags_str:
+        return
+    names = [n.strip() for n in tags_str.split(",") if n.strip()]
+    if not names:
+        return
+    try:
+        existing = await coord.client.list_tags()
+    except BabyTrackerError as err:
+        _LOGGER.warning("could not load tags for attach (entry was created): %s", err)
+        return
+    by_name_ci = {t["name"].lower(): t["id"] for t in existing}
+    tag_ids: list[int] = []
+    for name in names:
+        key = name.lower()
+        if key in by_name_ci:
+            tag_ids.append(by_name_ci[key])
+            continue
+        try:
+            created = await coord.client.create_tag(name)
+        except BabyTrackerError as err:
+            _LOGGER.warning("could not create tag %q (skipping): %s", name, err)
+            continue
+        tag_ids.append(created["id"])
+        by_name_ci[key] = created["id"]  # in case the same name appears twice
+    if not tag_ids:
+        return
+    try:
+        await coord.client.set_entity_tags(entity_type, entity_id, tag_ids)
+    except BabyTrackerError as err:
+        _LOGGER.warning("could not attach tags to %s/%s: %s", entity_type, entity_id, err)
 
 
 SCHEMA_LOG_FEEDING = _base_schema({
@@ -287,7 +336,12 @@ def _build_duration_payload(call: ServiceCall, child_id: int) -> dict[str, Any]:
     }
 
 
-async def _do_create(call: ServiceCall, fn_name: str, payload: dict) -> None:
+async def _do_create(
+    call: ServiceCall,
+    fn_name: str,
+    payload: dict,
+    entity_type: str | None = None,
+) -> None:
     coord = _coordinator(call.hass)
     fn = getattr(coord.client, fn_name)
     # Log at debug so users can enable `logger: babytracker: debug` and see
@@ -304,6 +358,15 @@ async def _do_create(call: ServiceCall, fn_name: str, payload: dict) -> None:
             f"BabyTracker {fn_name} failed: {err} — payload sent: {payload}"
         ) from err
     _LOGGER.debug("%s response: %s", fn_name, result)
+
+    # Tag attach happens AFTER the entry is created (we need the generated
+    # entry ID). Best-effort — if it fails the entry still exists, the user
+    # just won't see tags. entity_type being None means "this service
+    # doesn't support tagging" (refresh, set_slideshow, create_backup).
+    tags_str = call.data.get("tags") if entity_type else None
+    if entity_type and tags_str:
+        await _resolve_and_attach_tags(coord, entity_type, result.get("id") if isinstance(result, dict) else None, tags_str)
+
     # Use async_refresh (not async_request_refresh) so the sensor values
     # update immediately after the service call. async_request_refresh is
     # debounced; with our 10-minute poll interval it can delay visible
@@ -326,7 +389,7 @@ async def _log_feeding(call: ServiceCall) -> None:
     }
     if (amount := call.data.get("amount")) is not None:
         payload["amount"] = amount
-    await _do_create(call, "create_feeding", payload)
+    await _do_create(call, "create_feeding", payload, entity_type="feeding")
 
 
 async def _log_sleep(call: ServiceCall) -> None:
@@ -334,7 +397,7 @@ async def _log_sleep(call: ServiceCall) -> None:
     payload = _build_duration_payload(call, cid)
     payload["nap"] = call.data.get("nap", True)
     payload["notes"] = call.data.get("notes", "")
-    await _do_create(call, "create_sleep", payload)
+    await _do_create(call, "create_sleep", payload, entity_type="sleep")
 
 
 async def _log_diaper(call: ServiceCall) -> None:
@@ -359,7 +422,7 @@ async def _log_diaper(call: ServiceCall) -> None:
         "color": call.data.get("color", "") if solid else "",
         "notes": call.data.get("notes", ""),
     }
-    await _do_create(call, "create_diaper", payload)
+    await _do_create(call, "create_diaper", payload, entity_type="diaper")
 
 
 async def _log_tummy_time(call: ServiceCall) -> None:
@@ -369,7 +432,7 @@ async def _log_tummy_time(call: ServiceCall) -> None:
     # to disambiguate from the separate log_milestone service.
     payload["milestone"] = call.data.get("highlight", "")
     payload["notes"] = call.data.get("notes", "")
-    await _do_create(call, "create_tummy_time", payload)
+    await _do_create(call, "create_tummy_time", payload, entity_type="tummy_time")
 
 
 async def _log_pumping(call: ServiceCall) -> None:
@@ -377,7 +440,7 @@ async def _log_pumping(call: ServiceCall) -> None:
     payload = _build_duration_payload(call, cid)
     if (amount := call.data.get("amount")) is not None:
         payload["amount"] = amount
-    await _do_create(call, "create_pumping", payload)
+    await _do_create(call, "create_pumping", payload, entity_type="pumping")
 
 
 async def _log_temperature(call: ServiceCall) -> None:
@@ -389,7 +452,7 @@ async def _log_temperature(call: ServiceCall) -> None:
         "temperature": call.data["temperature"],
         "notes": call.data.get("notes", ""),
     }
-    await _do_create(call, "create_temperature", payload)
+    await _do_create(call, "create_temperature", payload, entity_type="temperature")
 
 
 async def _log_medication(call: ServiceCall) -> None:
@@ -404,7 +467,7 @@ async def _log_medication(call: ServiceCall) -> None:
     }
     if (dosage := call.data.get("dosage")) is not None:
         payload["dosage"] = dosage
-    await _do_create(call, "create_medication", payload)
+    await _do_create(call, "create_medication", payload, entity_type="medication")
 
 
 async def _log_note(call: ServiceCall) -> None:
@@ -415,7 +478,7 @@ async def _log_note(call: ServiceCall) -> None:
         "time": _local_iso(when),
         "note": call.data["note"],
     }
-    await _do_create(call, "create_note", payload)
+    await _do_create(call, "create_note", payload, entity_type="note")
 
 
 async def _log_milestone(call: ServiceCall) -> None:
@@ -428,7 +491,7 @@ async def _log_milestone(call: ServiceCall) -> None:
         # UI field is "details", backend stores it as "description".
         "description": call.data.get("details", ""),
     }
-    await _do_create(call, "create_milestone", payload)
+    await _do_create(call, "create_milestone", payload, entity_type="milestone")
 
 
 async def _log_weight(call: ServiceCall) -> None:
@@ -439,7 +502,7 @@ async def _log_weight(call: ServiceCall) -> None:
         "weight": call.data["weight"],
         "notes": call.data.get("notes", ""),
     }
-    await _do_create(call, "create_weight", payload)
+    await _do_create(call, "create_weight", payload, entity_type="weight")
 
 
 async def _log_height(call: ServiceCall) -> None:
@@ -450,7 +513,7 @@ async def _log_height(call: ServiceCall) -> None:
         "height": call.data["height"],
         "notes": call.data.get("notes", ""),
     }
-    await _do_create(call, "create_height", payload)
+    await _do_create(call, "create_height", payload, entity_type="height")
 
 
 async def _log_head_circumference(call: ServiceCall) -> None:
@@ -461,7 +524,7 @@ async def _log_head_circumference(call: ServiceCall) -> None:
         "head_circumference": call.data["head_circumference"],
         "notes": call.data.get("notes", ""),
     }
-    await _do_create(call, "create_head_circumference", payload)
+    await _do_create(call, "create_head_circumference", payload, entity_type="head_circumference")
 
 
 async def _start_timer(call: ServiceCall) -> None:

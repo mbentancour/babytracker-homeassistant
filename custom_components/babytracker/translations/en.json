@@ -148,6 +148,10 @@
           "name": "Ended at",
           "description": "When the feeding ended. Defaults to now if omitted."
         },
+        "tags": {
+          "name": "Tags",
+          "description": "Comma-separated list of tag names. New tags are created automatically with a default color; rename/recolor them in BabyTracker → Settings → Data → Tags."
+        },
         "notes": {
           "name": "Notes"
         }
@@ -171,6 +175,10 @@
         "ended_at": {
           "name": "Ended at",
           "description": "When the sleep ended. Defaults to now if omitted."
+        },
+        "tags": {
+          "name": "Tags",
+          "description": "Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags."
         },
         "notes": {
           "name": "Notes"
@@ -196,6 +204,10 @@
           "name": "When",
           "description": "When the change happened. Defaults to now."
         },
+        "tags": {
+          "name": "Tags",
+          "description": "Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags."
+        },
         "notes": {
           "name": "Notes"
         }
@@ -217,6 +229,10 @@
         "highlight": {
           "name": "Highlight",
           "description": "A short one-liner about anything notable during this session. Not the same as logging a developmental milestone — use \"Log milestone\" for those."
+        },
+        "tags": {
+          "name": "Tags",
+          "description": "Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags."
         },
         "notes": {
           "name": "Notes"
@@ -242,6 +258,10 @@
           "name": "Ended at",
           "description": "When the session ended. Defaults to now if omitted."
         },
+        "tags": {
+          "name": "Tags",
+          "description": "Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags."
+        },
         "notes": {
           "name": "Notes"
         }
@@ -261,6 +281,10 @@
         "when": {
           "name": "When",
           "description": "When the reading was taken. Defaults to now."
+        },
+        "tags": {
+          "name": "Tags",
+          "description": "Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags."
         },
         "notes": {
           "name": "Notes"
@@ -286,6 +310,10 @@
         "when": {
           "name": "When"
         },
+        "tags": {
+          "name": "Tags",
+          "description": "Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags."
+        },
         "notes": {
           "name": "Notes"
         }
@@ -300,6 +328,10 @@
         },
         "note": {
           "name": "Note"
+        },
+        "tags": {
+          "name": "Tags",
+          "description": "Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags."
         },
         "when": {
           "name": "When"
@@ -323,6 +355,10 @@
           "name": "Details",
           "description": "Longer description. Optional."
         },
+        "tags": {
+          "name": "Tags",
+          "description": "Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags."
+        },
         "date": {
           "name": "Date",
           "description": "When the milestone was reached. Defaults to today."
@@ -344,6 +380,10 @@
           "name": "Date",
           "description": "When the measurement was taken. Defaults to today."
         },
+        "tags": {
+          "name": "Tags",
+          "description": "Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags."
+        },
         "notes": {
           "name": "Notes"
         }
@@ -364,6 +404,10 @@
           "name": "Date",
           "description": "When the measurement was taken. Defaults to today."
         },
+        "tags": {
+          "name": "Tags",
+          "description": "Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags."
+        },
         "notes": {
           "name": "Notes"
         }
@@ -383,6 +427,10 @@
         "date": {
           "name": "Date",
           "description": "When the measurement was taken. Defaults to today."
+        },
+        "tags": {
+          "name": "Tags",
+          "description": "Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags."
         },
         "notes": {
           "name": "Notes"

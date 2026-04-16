@@ -165,6 +165,30 @@ when omitted.
 All write services need a **Read & Write** API token and trigger an
 immediate sensor refresh after the call succeeds.
 
+### Tags
+
+Every activity-logging service (feeding, sleep, diaper, tummy time, pumping,
+temperature, medication, note, milestone, weight, height, head circumference)
+accepts an optional **Tags** field — a comma-separated list of tag names
+that get attached to the entry. Unknown names are auto-created with a
+default color; rename or recolor them in BabyTracker → Settings → Data →
+Tags.
+
+Example automation snippet:
+
+```yaml
+service: babytracker.log_diaper
+data:
+  device_id: !secret lily_device_id
+  wet: true
+  solid: true
+  tags: "teething, nappy rash"
+```
+
+Creates the diaper entry, auto-creates the two tags if they don't exist,
+and attaches both to the entry. The tag list in the BabyTracker UI shows
+the same set on that row immediately.
+
 ## Example automations
 
 ### Notify when it's been more than 4 hours since the last feeding
