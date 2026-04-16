@@ -17,7 +17,7 @@ Design notes
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import logging
 from typing import Any
 
@@ -72,26 +72,36 @@ MEDICATION_UNITS = ["ml", "mg", "drop", "drops", "tablet", "tablets"]
 
 def _local_iso(dt: datetime | str | None = None) -> str:
     """Format a datetime as the API expects: YYYY-MM-DDTHH:MM:SS, no timezone,
-    no fractional seconds.
+    no fractional seconds. The string is always UTC wall-clock.
 
-    The BabyTracker backend parses with ``time.Parse("2006-01-02T15:04:05", ...)``
-    which rejects timezone suffixes, fractional seconds, or a space separator.
-    This helper normalises every input shape HA might pass us:
+    The BabyTracker backend parses timestamps with ``time.Parse(..., ...)``
+    against a layout that has no timezone, which always interprets the input
+    as UTC. So any naive-looking string we send is read as UTC. Previously
+    this helper sent *local* wall-clock — matching the buggy old frontend —
+    which silently stored every HA-automation entry off by the user's UTC
+    offset. Now we convert aware datetimes to UTC before stripping tzinfo,
+    and interpret naive inputs as HA's configured local time before
+    converting.
 
-    - ``None`` → now (local time).
-    - ``datetime`` (naive or aware) → stripped to naive, microseconds dropped.
-    - ``str`` (already formatted) → parsed, then renormalised, so that a
-      template value like ``{{ now() }}`` (which resolves to an ISO string
-      with timezone offset and microseconds) survives the round-trip.
+    Input shapes accepted:
+    - ``None`` → now (UTC).
+    - ``datetime`` (aware) → converted to UTC, tzinfo stripped.
+    - ``datetime`` (naive) → assumed local per the system locale,
+      converted to UTC, tzinfo stripped.
+    - ``str`` (ISO, usually tz-aware from HA templates) → parsed, UTC-ified.
     """
     if dt is None:
-        dt = datetime.now()
+        dt = datetime.now(timezone.utc)
     elif isinstance(dt, str):
         # HA templates often return tz-aware ISO strings; normalise those.
         try:
             dt = datetime.fromisoformat(dt.replace("Z", "+00:00"))
         except ValueError as err:
             raise ValueError(f"unparseable datetime: {dt!r}") from err
+    if dt.tzinfo is None:
+        # Naive — interpret against the local time the machine is in.
+        dt = dt.astimezone()
+    dt = dt.astimezone(timezone.utc)
     return dt.replace(tzinfo=None, microsecond=0).isoformat(timespec="seconds")
 
 

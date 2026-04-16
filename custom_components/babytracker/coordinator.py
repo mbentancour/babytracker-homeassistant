@@ -232,16 +232,21 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             status[d["id"]] = BackupStatus(destination=d)
 
         # Walk the deduped backup list — each entry carries the destinations
-        # that hold a copy. The "date" field is formatted by the backend as
-        # YYYY-MM-DD HH:MM:SS in local time of the server. Not ideal for
-        # timezone correctness but good enough for "last backup ran at X".
+        # that hold a copy. The "date" field is RFC3339 UTC from modern
+        # backends ("2026-04-16T10:35:22Z"); older backends emitted naive
+        # "YYYY-MM-DD HH:MM:SS" against server-local time. Parse both.
         for entry in backups:
             date_str = entry.get("date", "")
             when: datetime | None = None
             try:
-                when = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+                # RFC3339 — fromisoformat handles "Z" natively on 3.11+;
+                # the replace() keeps us compatible with 3.9/3.10.
+                when = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
             except ValueError:
-                pass
+                try:
+                    when = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    pass
             for dref in entry.get("destinations", []) or []:
                 did = dref.get("id")
                 if did not in status:
