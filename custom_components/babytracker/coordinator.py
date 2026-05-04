@@ -92,6 +92,25 @@ def _duration_minutes(item: dict, start_field: str = "start", end_field: str = "
     return max(0, int((end - start).total_seconds() // 60))
 
 
+def _overlap_minutes(item: dict, window_start: datetime, window_end: datetime) -> int:
+    """Return how many minutes of an entry's [start, end] fall within
+    [window_start, window_end]. Used by today-totals so an overnight sleep
+    that straddles the day boundary contributes only the portion that's
+    actually in today, not its whole duration (counted in full when start ∈
+    window) or zero (counted as nothing when start ∉ window). Ongoing
+    entries with no end are clipped to the window's upper bound.
+    """
+    start = _parse_iso(item.get("start"))
+    if not start:
+        return 0
+    end = _parse_iso(item.get("end")) or window_end
+    overlap_start = max(start, window_start)
+    overlap_end = min(end, window_end)
+    if overlap_end <= overlap_start:
+        return 0
+    return int((overlap_end - overlap_start).total_seconds() // 60)
+
+
 class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
     """Polls BabyTracker on a fixed interval."""
 
@@ -142,6 +161,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 snap.latest_head_circumference = head_circs[0] if head_circs else None
                 snap.latest_bmi = bmis[0] if bmis else None
 
+                today_end = today_start + timedelta(days=1)
                 for f in feedings:
                     start = _parse_iso(f.get("start"))
                     if start and start >= today_start:
@@ -150,9 +170,10 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                         if isinstance(amount, (int, float)):
                             snap.feeding_volume_today += float(amount)
                 for s in sleeps:
-                    start = _parse_iso(s.get("start"))
-                    if start and start >= today_start:
-                        snap.sleep_minutes_today += _duration_minutes(s)
+                    # Use window overlap, not start-bucketed duration: an
+                    # overnight sleep contributes only the minutes that fall
+                    # inside today, regardless of which day its start is on.
+                    snap.sleep_minutes_today += _overlap_minutes(s, today_start, today_end)
                 for d in changes:
                     t = _parse_iso(d.get("time"))
                     if t and t >= today_start:
