@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from . import timeutil
 from .api import AuthError, BabyTrackerClient, BabyTrackerError
 from .const import (
     DEFAULT_SCAN_INTERVAL,
@@ -77,41 +78,11 @@ def _start_of_today_utc() -> datetime:
     return dt_util.start_of_local_day().astimezone(timezone.utc)
 
 
-def _parse_iso(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    try:
-        # Backend emits RFC3339; Python 3.11+ handles "Z" suffix
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except (TypeError, ValueError):
-        return None
-
-
-def _duration_minutes(item: dict, start_field: str = "start", end_field: str = "end") -> int:
-    start = _parse_iso(item.get(start_field))
-    end = _parse_iso(item.get(end_field))
-    if not start or not end:
-        return 0
-    return max(0, int((end - start).total_seconds() // 60))
-
-
-def _overlap_minutes(item: dict, window_start: datetime, window_end: datetime) -> int:
-    """Return how many minutes of an entry's [start, end] fall within
-    [window_start, window_end]. Used by today-totals so an overnight sleep
-    that straddles the day boundary contributes only the portion that's
-    actually in today, not its whole duration (counted in full when start ∈
-    window) or zero (counted as nothing when start ∉ window). Ongoing
-    entries with no end are clipped to the window's upper bound.
-    """
-    start = _parse_iso(item.get("start"))
-    if not start:
-        return 0
-    end = _parse_iso(item.get("end")) or window_end
-    overlap_start = max(start, window_start)
-    overlap_end = min(end, window_end)
-    if overlap_end <= overlap_start:
-        return 0
-    return int((overlap_end - overlap_start).total_seconds() // 60)
+# Pure time helpers live in timeutil (no HA imports) so they're unit-testable
+# standalone. Aliased here to keep the existing call sites unchanged.
+_parse_iso = timeutil.parse_iso
+_duration_minutes = timeutil.duration_minutes
+_overlap_minutes = timeutil.overlap_minutes
 
 
 class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
