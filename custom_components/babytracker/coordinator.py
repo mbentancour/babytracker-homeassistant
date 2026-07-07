@@ -159,9 +159,18 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 try:
                     cfg = await self.client.get_config()
                     self.unit_system = cfg.get("unit_system") or "metric"
+                    self._unit_system_loaded = True
                 except BabyTrackerError as err:
-                    _LOGGER.debug("unit system fetch failed, assuming metric: %s", err)
-                self._unit_system_loaded = True
+                    # Sensor units are fixed at entity __init__ from this value,
+                    # and entities are created right after the first refresh —
+                    # so if the unit system is still unknown on the first
+                    # refresh, fail the whole refresh rather than create an
+                    # imperial household's sensors mislabelled kg/cm/mL/°C.
+                    # Later refreshes just retry silently (entities already
+                    # exist; nothing to mislabel).
+                    if not self._first_refresh_done:
+                        raise UpdateFailed(f"could not determine unit system: {err}") from err
+                    _LOGGER.debug("unit system fetch failed, will retry next refresh: %s", err)
 
             children, timers = await asyncio.gather(
                 self.client.list_children(),
