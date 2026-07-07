@@ -26,6 +26,11 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
+          # "brands" requires the integration to be listed in the external
+          # home-assistant/brands repo, which is a separate submission and not
+          # something this repo can satisfy on its own. Skip it so CI reflects
+          # only checks fixable here.
+          ignore: brands
 
   syntax:
     name: Python syntax
