@@ -25,6 +25,7 @@ import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
+from homeassistant.util import dt as dt_util
 
 from .api import BabyTrackerError
 from .const import DOMAIN, SERVICE_CREATE_BACKUP
@@ -86,7 +87,7 @@ def _local_iso(dt: datetime | str | None = None) -> str:
     Input shapes accepted:
     - ``None`` → now (UTC).
     - ``datetime`` (aware) → converted to UTC, tzinfo stripped.
-    - ``datetime`` (naive) → assumed local per the system locale,
+    - ``datetime`` (naive) → assumed to be in HA's configured timezone,
       converted to UTC, tzinfo stripped.
     - ``str`` (ISO, usually tz-aware from HA templates) → parsed, UTC-ified.
     """
@@ -99,8 +100,10 @@ def _local_iso(dt: datetime | str | None = None) -> str:
         except ValueError as err:
             raise ValueError(f"unparseable datetime: {dt!r}") from err
     if dt.tzinfo is None:
-        # Naive — interpret against the local time the machine is in.
-        dt = dt.astimezone()
+        # Naive — a user typing "14:00" in an automation means 14:00 in
+        # HA's configured timezone, not the OS one (containers often sit
+        # at UTC while HA is configured for the household's zone).
+        dt = dt.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
     dt = dt.astimezone(timezone.utc)
     return dt.replace(tzinfo=None, microsecond=0).isoformat(timespec="seconds")
 
@@ -109,7 +112,9 @@ def _date_iso(d: date | str | None = None) -> str:
     """Format a date as the API expects: YYYY-MM-DD. Accepts datetime (takes
     the date component), date, ISO-8601 string, or None (= today)."""
     if d is None:
-        return date.today().isoformat()
+        # "Today" in HA's configured timezone — date.today() uses the OS
+        # zone, which is a different day around midnight on UTC containers.
+        return dt_util.now().date().isoformat()
     if isinstance(d, datetime):
         return d.date().isoformat()
     if isinstance(d, date):
@@ -337,7 +342,7 @@ SCHEMA_CREATE_BACKUP = vol.Schema({
 
 def _build_duration_payload(call: ServiceCall, child_id: int) -> dict[str, Any]:
     """Compute start/end times for duration-based services."""
-    end = call.data.get("ended_at") or datetime.now()
+    end = call.data.get("ended_at") or dt_util.now()
     start = end - timedelta(minutes=call.data["duration_minutes"]) if "duration_minutes" in call.data else end
     return {
         "child": child_id,
@@ -387,7 +392,7 @@ async def _do_create(
 async def _log_feeding(call: ServiceCall) -> None:
     cid = _resolve_child_id(call.hass, call.data["device_id"])
     duration = call.data.get("duration_minutes", 0)
-    end = call.data.get("ended_at") or datetime.now()
+    end = call.data.get("ended_at") or dt_util.now()
     start = end - timedelta(minutes=duration)
     payload = {
         "child": cid,
@@ -421,7 +426,7 @@ async def _log_diaper(call: ServiceCall) -> None:
         raise ServiceValidationError(
             "Tick at least one of Wet or Solid."
         )
-    when = call.data.get("when") or datetime.now()
+    when = call.data.get("when") or dt_util.now()
     payload = {
         "child": cid,
         "time": _local_iso(when),
@@ -455,7 +460,7 @@ async def _log_pumping(call: ServiceCall) -> None:
 
 async def _log_temperature(call: ServiceCall) -> None:
     cid = _resolve_child_id(call.hass, call.data["device_id"])
-    when = call.data.get("when") or datetime.now()
+    when = call.data.get("when") or dt_util.now()
     payload = {
         "child": cid,
         "time": _local_iso(when),
@@ -467,7 +472,7 @@ async def _log_temperature(call: ServiceCall) -> None:
 
 async def _log_medication(call: ServiceCall) -> None:
     cid = _resolve_child_id(call.hass, call.data["device_id"])
-    when = call.data.get("when") or datetime.now()
+    when = call.data.get("when") or dt_util.now()
     payload = {
         "child": cid,
         "time": _local_iso(when),
@@ -482,7 +487,7 @@ async def _log_medication(call: ServiceCall) -> None:
 
 async def _log_note(call: ServiceCall) -> None:
     cid = _resolve_child_id(call.hass, call.data["device_id"])
-    when = call.data.get("when") or datetime.now()
+    when = call.data.get("when") or dt_util.now()
     payload = {
         "child": cid,
         "time": _local_iso(when),

@@ -18,8 +18,22 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: BabyTrackerCoordinator = hass.data[DOMAIN][entry.entry_id]
-    entities = [ActiveTimerBinarySensor(coordinator, c["id"]) for c in coordinator.data.children]
-    async_add_entities(entities)
+    known_children: set[int] = set()
+
+    # Listener keeps adding sensors for children created after setup, so a
+    # second baby appears in HA without reloading the integration.
+    def _sync_entities() -> None:
+        new = []
+        for child in coordinator.data.children:
+            cid = child["id"]
+            if cid not in known_children:
+                known_children.add(cid)
+                new.append(ActiveTimerBinarySensor(coordinator, cid))
+        if new:
+            async_add_entities(new)
+
+    _sync_entities()
+    entry.async_on_unload(coordinator.async_add_listener(_sync_entities))
 
 
 class ActiveTimerBinarySensor(CoordinatorEntity[BabyTrackerCoordinator], BinarySensorEntity):

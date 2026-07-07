@@ -1,6 +1,7 @@
 """Data update coordinator that polls BabyTracker for all configured children."""
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import logging
@@ -8,6 +9,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .api import AuthError, BabyTrackerClient, BabyTrackerError
 from .const import (
@@ -69,9 +71,10 @@ class BabyTrackerData:
 
 
 def _start_of_today_utc() -> datetime:
-    now = datetime.now(timezone.utc).astimezone()
-    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    return midnight.astimezone(timezone.utc)
+    # Use HA's configured timezone, not the OS one — on containers/VMs left
+    # at UTC the two differ and every *_today sensor would reset and bucket
+    # entries at the wrong hour.
+    return dt_util.start_of_local_day().astimezone(timezone.utc)
 
 
 def _parse_iso(value: str | None) -> datetime | None:
@@ -123,32 +126,60 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         )
         self.client = client
         self.entry_id = entry_id
+        # Backend display preference ("metric"/"imperial"). Values are stored
+        # as entered on the backend, so sensor units must follow this or an
+        # imperial household's readings get labelled kg/cm/mL/°C in HA.
+        self.unit_system: str = "metric"
+        self._unit_system_loaded = False
         # Track previously-seen entry IDs per (child, kind) so we can emit
         # events only for newly-created entries (not on first refresh).
         self._seen: dict[tuple[int, str], set[int]] = {}
         self._seen_timers: set[int] = set()
         self._first_refresh_done = False
 
+    async def _fetch_child_lists(self, cid: int) -> tuple[list, ...]:
+        """Fetch all per-child lists concurrently instead of ~9 serial calls
+        per child — with several children and 10s request timeouts a single
+        slow endpoint otherwise stalls the whole refresh."""
+        return await asyncio.gather(
+            self.client.list_feedings(cid, limit=100),
+            self.client.list_sleep(cid, limit=100),
+            self.client.list_changes(cid, limit=100),
+            self.client.list_temperature(cid, limit=1),
+            self.client.list_medications(cid, limit=1),
+            self.client.list_weight(cid, limit=1),
+            self.client.list_height(cid, limit=1),
+            self.client.list_head_circumference(cid, limit=1),
+            self.client.list_bmi(cid, limit=1),
+        )
+
     async def _async_update_data(self) -> BabyTrackerData:
         try:
-            children = await self.client.list_children()
-            timers = await self.client.list_timers()
+            if not self._unit_system_loaded:
+                try:
+                    cfg = await self.client.get_config()
+                    self.unit_system = cfg.get("unit_system") or "metric"
+                except BabyTrackerError as err:
+                    _LOGGER.debug("unit system fetch failed, assuming metric: %s", err)
+                self._unit_system_loaded = True
+
+            children, timers = await asyncio.gather(
+                self.client.list_children(),
+                self.client.list_timers(),
+            )
 
             today_start = _start_of_today_utc()
             snapshots: dict[int, ChildSnapshot] = {}
             child_by_id = {c["id"]: c for c in children}
 
-            for child in children:
+            per_child = await asyncio.gather(
+                *(self._fetch_child_lists(c["id"]) for c in children)
+            )
+
+            for child, lists in zip(children, per_child):
                 cid = child["id"]
-                feedings = await self.client.list_feedings(cid, limit=100)
-                sleeps = await self.client.list_sleep(cid, limit=100)
-                changes = await self.client.list_changes(cid, limit=100)
-                temps = await self.client.list_temperature(cid, limit=1)
-                meds = await self.client.list_medications(cid, limit=1)
-                weights = await self.client.list_weight(cid, limit=1)
-                heights = await self.client.list_height(cid, limit=1)
-                head_circs = await self.client.list_head_circumference(cid, limit=1)
-                bmis = await self.client.list_bmi(cid, limit=1)
+                (feedings, sleeps, changes, temps, meds,
+                 weights, heights, head_circs, bmis) = lists
 
                 snap = ChildSnapshot(child=child)
                 snap.last_feeding = feedings[0] if feedings else None

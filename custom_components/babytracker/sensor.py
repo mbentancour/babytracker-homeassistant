@@ -9,6 +9,12 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import (
+    UnitOfLength,
+    UnitOfMass,
+    UnitOfTemperature,
+    UnitOfVolume,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -59,44 +65,61 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up sensors for every child known to the coordinator, plus one
-    pair of sensors per backup destination."""
+    pair of sensors per backup destination. A coordinator listener keeps
+    adding sensors for children/destinations created after setup — without
+    it a second baby (or new backup destination) never appears in HA until
+    the integration is reloaded."""
     coordinator: BabyTrackerCoordinator = hass.data[DOMAIN][entry.entry_id]
-    entities: list[SensorEntity] = []
-    for child in coordinator.data.children:
-        cid = child["id"]
-        entities.extend([
-            LastFeedingSensor(coordinator, cid),
-            LastSleepSensor(coordinator, cid),
-            LastDiaperSensor(coordinator, cid),
-            LastTemperatureSensor(coordinator, cid),
-            LastMedicationSensor(coordinator, cid),
-            FeedingsTodaySensor(coordinator, cid),
-            FeedingVolumeTodaySensor(coordinator, cid),
-            SleepHoursTodaySensor(coordinator, cid),
-            DiapersTodaySensor(coordinator, cid),
-            DiapersWetTodaySensor(coordinator, cid),
-            DiapersSolidTodaySensor(coordinator, cid),
-            HoursSinceFeedingSensor(coordinator, cid),
-            HoursSinceSleepSensor(coordinator, cid),
-            HoursSinceDiaperSensor(coordinator, cid),
-            AgeDaysSensor(coordinator, cid),
-            AgeWeeksSensor(coordinator, cid),
-            AgeMonthsSensor(coordinator, cid),
-            LatestWeightSensor(coordinator, cid),
-            LatestHeightSensor(coordinator, cid),
-            LatestHeadCircumferenceSensor(coordinator, cid),
-            LatestBMISensor(coordinator, cid),
-            ActiveTimerDurationSensor(coordinator, cid),
-        ])
-    # One pair of backup-status sensors per destination. The coordinator's
-    # backup_status map is populated best-effort; destinations the user
-    # hasn't configured (or the token can't see) are simply absent.
-    for destination_id in coordinator.data.backup_status:
-        entities.extend([
-            BackupLastSuccessSensor(coordinator, destination_id),
-            BackupCountSensor(coordinator, destination_id),
-        ])
-    async_add_entities(entities)
+    known_children: set[int] = set()
+    known_destinations: set[int] = set()
+
+    def _sync_entities() -> None:
+        new: list[SensorEntity] = []
+        for child in coordinator.data.children:
+            cid = child["id"]
+            if cid in known_children:
+                continue
+            known_children.add(cid)
+            new.extend([
+                LastFeedingSensor(coordinator, cid),
+                LastSleepSensor(coordinator, cid),
+                LastDiaperSensor(coordinator, cid),
+                LastTemperatureSensor(coordinator, cid),
+                LastMedicationSensor(coordinator, cid),
+                FeedingsTodaySensor(coordinator, cid),
+                FeedingVolumeTodaySensor(coordinator, cid),
+                SleepHoursTodaySensor(coordinator, cid),
+                DiapersTodaySensor(coordinator, cid),
+                DiapersWetTodaySensor(coordinator, cid),
+                DiapersSolidTodaySensor(coordinator, cid),
+                HoursSinceFeedingSensor(coordinator, cid),
+                HoursSinceSleepSensor(coordinator, cid),
+                HoursSinceDiaperSensor(coordinator, cid),
+                AgeDaysSensor(coordinator, cid),
+                AgeWeeksSensor(coordinator, cid),
+                AgeMonthsSensor(coordinator, cid),
+                LatestWeightSensor(coordinator, cid),
+                LatestHeightSensor(coordinator, cid),
+                LatestHeadCircumferenceSensor(coordinator, cid),
+                LatestBMISensor(coordinator, cid),
+                ActiveTimerDurationSensor(coordinator, cid),
+            ])
+        # One pair of backup-status sensors per destination. The coordinator's
+        # backup_status map is populated best-effort; destinations the user
+        # hasn't configured (or the token can't see) are simply absent.
+        for destination_id in coordinator.data.backup_status:
+            if destination_id in known_destinations:
+                continue
+            known_destinations.add(destination_id)
+            new.extend([
+                BackupLastSuccessSensor(coordinator, destination_id),
+                BackupCountSensor(coordinator, destination_id),
+            ])
+        if new:
+            async_add_entities(new)
+
+    _sync_entities()
+    entry.async_on_unload(coordinator.async_add_listener(_sync_entities))
 
 
 class _ChildSensor(CoordinatorEntity[BabyTrackerCoordinator], SensorEntity):
@@ -109,6 +132,13 @@ class _ChildSensor(CoordinatorEntity[BabyTrackerCoordinator], SensorEntity):
         self._child_id = child_id
         self._key = key
         self._attr_unique_id = f"{coordinator.entry_id}_child{child_id}_{key}"
+
+    @property
+    def _imperial(self) -> bool:
+        # The backend stores measurement values as entered under its
+        # configured unit system — sensor units must match or an imperial
+        # household's readings get labelled kg/cm/mL/°C.
+        return self.coordinator.unit_system == "imperial"
 
     @property
     def _snapshot(self):
@@ -215,11 +245,13 @@ class FeedingsTodaySensor(_ChildSensor):
 class FeedingVolumeTodaySensor(_ChildSensor):
     _attr_translation_key = SENSOR_FEEDING_VOLUME_TODAY
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
-    _attr_native_unit_of_measurement = "mL"
 
     def __init__(self, coordinator, child_id):
         super().__init__(coordinator, child_id, SENSOR_FEEDING_VOLUME_TODAY)
         self._attr_name = "Feeding volume today"
+        self._attr_native_unit_of_measurement = (
+            UnitOfVolume.FLUID_OUNCES if self._imperial else UnitOfVolume.MILLILITERS
+        )
 
     @property
     def native_value(self):
@@ -296,10 +328,16 @@ class LastTemperatureSensor(_ChildSensor):
 
     _attr_translation_key = SENSOR_LAST_TEMPERATURE
     _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator, child_id):
         super().__init__(coordinator, child_id, SENSOR_LAST_TEMPERATURE)
         self._attr_name = "Last temperature"
+        # Required for a TEMPERATURE device class — without it HA logs a
+        # missing-unit warning and long-term statistics are unreliable.
+        self._attr_native_unit_of_measurement = (
+            UnitOfTemperature.FAHRENHEIT if self._imperial else UnitOfTemperature.CELSIUS
+        )
 
     @property
     def native_value(self):
@@ -516,11 +554,13 @@ class LatestWeightSensor(_ChildSensor):
     _attr_translation_key = SENSOR_LATEST_WEIGHT
     _attr_device_class = SensorDeviceClass.WEIGHT
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = "kg"
 
     def __init__(self, coordinator, child_id):
         super().__init__(coordinator, child_id, SENSOR_LATEST_WEIGHT)
         self._attr_name = "Latest weight"
+        self._attr_native_unit_of_measurement = (
+            UnitOfMass.POUNDS if self._imperial else UnitOfMass.KILOGRAMS
+        )
 
     @property
     def native_value(self):
@@ -542,11 +582,13 @@ class LatestHeightSensor(_ChildSensor):
     _attr_translation_key = SENSOR_LATEST_HEIGHT
     _attr_device_class = SensorDeviceClass.DISTANCE
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = "cm"
 
     def __init__(self, coordinator, child_id):
         super().__init__(coordinator, child_id, SENSOR_LATEST_HEIGHT)
         self._attr_name = "Latest height"
+        self._attr_native_unit_of_measurement = (
+            UnitOfLength.INCHES if self._imperial else UnitOfLength.CENTIMETERS
+        )
 
     @property
     def native_value(self):
@@ -568,11 +610,13 @@ class LatestHeadCircumferenceSensor(_ChildSensor):
     _attr_translation_key = SENSOR_LATEST_HEAD_CIRCUMFERENCE
     _attr_device_class = SensorDeviceClass.DISTANCE
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = "cm"
 
     def __init__(self, coordinator, child_id):
         super().__init__(coordinator, child_id, SENSOR_LATEST_HEAD_CIRCUMFERENCE)
         self._attr_name = "Latest head circumference"
+        self._attr_native_unit_of_measurement = (
+            UnitOfLength.INCHES if self._imperial else UnitOfLength.CENTIMETERS
+        )
 
     @property
     def native_value(self):
