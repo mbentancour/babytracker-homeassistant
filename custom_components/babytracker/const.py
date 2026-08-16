@@ -22,6 +22,7 @@ EVENT_NEW_SLEEP = "babytracker_new_sleep"
 EVENT_NEW_DIAPER = "babytracker_new_diaper"
 EVENT_NEW_TEMPERATURE = "babytracker_new_temperature"
 EVENT_NEW_MEDICATION = "babytracker_new_medication"
+EVENT_NEW_MILK_WASTE = "babytracker_new_milk_waste"
 EVENT_TIMER_STARTED = "babytracker_timer_started"
 EVENT_TIMER_STOPPED = "babytracker_timer_stopped"
 
@@ -57,9 +58,15 @@ SENSOR_LATEST_BMI = "latest_bmi"
 # coordinator refresh. Handy for "feeding is at 12 minutes" dashboards.
 SENSOR_ACTIVE_TIMER_DURATION = "active_timer_duration"
 
+# Estimated stored breast milk: pumped minus expressed-milk bottles minus what
+# was poured away. Requires BabyTracker 1.10.0 or newer — on older servers the
+# endpoint doesn't exist and the sensor is simply never created.
+SENSOR_MILK_STOCK = "milk_stock"
+
 # Integration-level (not per-child) sensors.
 SENSOR_BACKUP_LAST_SUCCESS = "backup_last_success"
 SENSOR_BACKUP_COUNT = "backup_count"
 
 # Service names
 SERVICE_CREATE_BACKUP = "create_backup"
+SERVICE_LOG_MILK_WASTE = "log_milk_waste"

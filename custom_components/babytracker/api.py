@@ -139,6 +139,22 @@ class BabyTrackerClient:
         )
         return data.get("results", [])
 
+    # Uneaten milk — added in BabyTracker 1.10.0 alongside milk stock.
+    # Callers must tolerate BabyTrackerError: on older servers this 404s.
+    async def list_milk_waste(self, child_id: int, limit: int = 5) -> list[dict]:
+        data = await self._request(
+            "GET", "/api/milk-waste/",
+            params={"child": child_id, "limit": limit, "ordering": "-time"},
+        )
+        return data.get("results", [])
+
+    # Milk stock — the running stash balance, added in BabyTracker 1.10.0.
+    # Callers must tolerate BabyTrackerError: on older servers this 404s.
+    async def get_milk_stock(self, child_id: int) -> dict:
+        return await self._request(
+            "GET", "/api/milk-stock", params={"child": child_id},
+        )
+
     # Backup introspection — drives the "last successful backup" sensors and
     # the create_backup service acknowledgement.
     async def list_backups(self) -> list[dict]:
@@ -212,6 +228,9 @@ class BabyTrackerClient:
 
     async def create_medication(self, payload: dict) -> dict:
         return await self._request("POST", "/api/medications/", json=payload)
+
+    async def create_milk_waste(self, payload: dict) -> dict:
+        return await self._request("POST", "/api/milk-waste/", json=payload)
 
     async def create_note(self, payload: dict) -> dict:
         return await self._request("POST", "/api/notes/", json=payload)

@@ -22,6 +22,7 @@ following entities:
 | `sensor.<name>_hours_since_last_diaper`        | hours     | Hours since the last diaper change         |
 | `sensor.<name>_feedings_today`                 | count     | Number of feedings since midnight          |
 | `sensor.<name>_feeding_volume_today`           | mL        | Total fed volume today                     |
+| `sensor.<name>_milk_stock`                     | mL        | Estimated stored breast milk. Attributes carry `pumped`, `bottle_fed` and `discarded`. Needs BabyTracker 1.10.0+; only appears for children the server reports a stash for |
 | `sensor.<name>_sleep_today`                    | hours     | Total sleep today                          |
 | `sensor.<name>_diapers_today`                  | count     | Number of diapers today                    |
 | `sensor.<name>_wet_diapers_today`              | count     | Number of wet diapers today                |
@@ -112,6 +113,7 @@ detected in BabyTracker:
 | `babytracker_new_diaper`         | A diaper change is logged        | `child_id`, `child_name`, `entry`   |
 | `babytracker_new_temperature`    | A temperature is logged          | `child_id`, `child_name`, `entry`   |
 | `babytracker_new_medication`     | A medication dose is logged      | `child_id`, `child_name`, `entry`   |
+| `babytracker_new_milk_waste`     | Uneaten milk is logged           | `child_id`, `child_name`, `entry`   |
 | `babytracker_timer_started`      | A timer starts                   | `child_id`, `child_name`, `timer`   |
 | `babytracker_timer_stopped`      | A timer is stopped/deleted       | `timer_id`                          |
 
@@ -134,6 +136,7 @@ when omitted.
 | `babytracker.log_diaper`               | Record a diaper change                |
 | `babytracker.log_tummy_time`           | Record a tummy time session           |
 | `babytracker.log_pumping`              | Record a pumping session              |
+| `babytracker.log_milk_waste`           | Record expressed milk poured away     |
 | `babytracker.log_temperature`          | Record a temperature reading          |
 | `babytracker.log_medication`           | Record a medication dose              |
 | `babytracker.log_note`                 | Record a free-form note               |

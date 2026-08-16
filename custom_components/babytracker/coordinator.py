@@ -19,6 +19,7 @@ from .const import (
     EVENT_NEW_DIAPER,
     EVENT_NEW_FEEDING,
     EVENT_NEW_MEDICATION,
+    EVENT_NEW_MILK_WASTE,
     EVENT_NEW_SLEEP,
     EVENT_NEW_TEMPERATURE,
     EVENT_TIMER_STARTED,
@@ -50,6 +51,9 @@ class ChildSnapshot:
     latest_height: dict | None = None
     latest_head_circumference: dict | None = None
     latest_bmi: dict | None = None
+    # Estimated stored breast milk. None when the server predates 1.10.0 or
+    # the token can't read pumping — the sensor is then never created.
+    milk_stock: dict | None = None
 
 
 @dataclass
@@ -108,8 +112,40 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         self._seen_timers: set[int] = set()
         self._first_refresh_done = False
 
-    async def _fetch_child_lists(self, cid: int) -> tuple[list, ...]:
-        """Fetch all per-child lists concurrently instead of ~9 serial calls
+    async def _milk_stock(self, cid: int) -> dict | None:
+        """Milk stock, or None if this server can't provide it.
+
+        /api/milk-stock arrived in BabyTracker 1.10.0, so on an older server
+        every call 404s. Swallowing that here matters: this runs inside the
+        gather below, and asyncio.gather propagates the first exception, so an
+        unguarded call would take down the entire refresh for every sensor.
+
+        Re-attempted on each refresh rather than latched off, so the sensor
+        appears by itself once the server is upgraded. Six wasted requests an
+        hour per child is a fair price for not needing an HA restart.
+        """
+        try:
+            return await self.client.get_milk_stock(cid)
+        except BabyTrackerError as err:
+            _LOGGER.debug("milk stock unavailable for child %s: %s", cid, err)
+            return None
+
+    async def _milk_waste(self, cid: int) -> list[dict]:
+        """Recent uneaten-milk entries, or [] if this server can't provide them.
+
+        Guarded for the same reason as _milk_stock. Polled as well as pushed so
+        babytracker_new_milk_waste keeps firing on installs where webhook
+        registration failed and the 10-minute poll is doing the work — the
+        other five entry events already behave that way.
+        """
+        try:
+            return await self.client.list_milk_waste(cid, limit=5)
+        except BabyTrackerError as err:
+            _LOGGER.debug("milk waste unavailable for child %s: %s", cid, err)
+            return []
+
+    async def _fetch_child_lists(self, cid: int) -> tuple[Any, ...]:
+        """Fetch all per-child lists concurrently instead of ~10 serial calls
         per child — with several children and 10s request timeouts a single
         slow endpoint otherwise stalls the whole refresh."""
         return await asyncio.gather(
@@ -122,6 +158,8 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             self.client.list_height(cid, limit=1),
             self.client.list_head_circumference(cid, limit=1),
             self.client.list_bmi(cid, limit=1),
+            self._milk_stock(cid),
+            self._milk_waste(cid),
         )
 
     async def _async_update_data(self) -> BabyTrackerData:
@@ -159,7 +197,8 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             for child, lists in zip(children, per_child):
                 cid = child["id"]
                 (feedings, sleeps, changes, temps, meds,
-                 weights, heights, head_circs, bmis) = lists
+                 weights, heights, head_circs, bmis, milk_stock,
+                 milk_waste) = lists
 
                 snap = ChildSnapshot(child=child)
                 snap.last_feeding = feedings[0] if feedings else None
@@ -171,6 +210,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 snap.latest_height = heights[0] if heights else None
                 snap.latest_head_circumference = head_circs[0] if head_circs else None
                 snap.latest_bmi = bmis[0] if bmis else None
+                snap.milk_stock = milk_stock
 
                 today_end = today_start + timedelta(days=1)
                 for f in feedings:
@@ -206,6 +246,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 self._emit_new_entries(cid, child, "diaper", changes, EVENT_NEW_DIAPER)
                 self._emit_new_entries(cid, child, "temperature", temps, EVENT_NEW_TEMPERATURE)
                 self._emit_new_entries(cid, child, "medication", meds, EVENT_NEW_MEDICATION)
+                self._emit_new_entries(cid, child, "milk_waste", milk_waste, EVENT_NEW_MILK_WASTE)
 
             # Timer events: detect started (in current set, not previously seen)
             # and stopped (previously seen, not in current set).
