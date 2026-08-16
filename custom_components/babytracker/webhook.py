@@ -35,6 +35,7 @@ from .const import (
     EVENT_NEW_DIAPER,
     EVENT_NEW_FEEDING,
     EVENT_NEW_MEDICATION,
+    EVENT_NEW_MILK_WASTE,
     EVENT_NEW_SLEEP,
     EVENT_NEW_TEMPERATURE,
     EVENT_TIMER_STARTED,
@@ -61,6 +62,7 @@ _EVENT_MAP = {
     "diaper.created": EVENT_NEW_DIAPER,
     "temperature.created": EVENT_NEW_TEMPERATURE,
     "medication.created": EVENT_NEW_MEDICATION,
+    "milk_waste.created": EVENT_NEW_MILK_WASTE,
     "timer.started": EVENT_TIMER_STARTED,
     "timer.stopped": EVENT_TIMER_STOPPED,
 }

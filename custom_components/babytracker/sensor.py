@@ -42,6 +42,7 @@ from .const import (
     SENSOR_LAST_SLEEP,
     SENSOR_LAST_TEMPERATURE,
     SENSOR_LATEST_BMI,
+    SENSOR_MILK_STOCK,
     SENSOR_LATEST_HEAD_CIRCUMFERENCE,
     SENSOR_LATEST_HEIGHT,
     SENSOR_LATEST_WEIGHT,
@@ -72,6 +73,10 @@ async def async_setup_entry(
     coordinator: BabyTrackerCoordinator = hass.data[DOMAIN][entry.entry_id]
     known_children: set[int] = set()
     known_destinations: set[int] = set()
+    # Milk stock is tracked separately from known_children: the endpoint only
+    # exists on BabyTracker 1.10.0+, so the sensor has to be able to appear
+    # later — on a server upgrade — rather than only at child discovery.
+    known_milk_stock: set[int] = set()
 
     def _sync_entities() -> None:
         new: list[SensorEntity] = []
@@ -104,6 +109,16 @@ async def async_setup_entry(
                 LatestBMISensor(coordinator, cid),
                 ActiveTimerDurationSensor(coordinator, cid),
             ])
+        # Only for children the server actually reports a stash for. Creating
+        # it unconditionally would leave every household that doesn't pump —
+        # and everyone on an older server — with a permanently unavailable
+        # sensor.
+        for cid, snap in coordinator.data.snapshots.items():
+            if cid in known_milk_stock or snap.milk_stock is None:
+                continue
+            known_milk_stock.add(cid)
+            new.append(MilkStockSensor(coordinator, cid))
+
         # One pair of backup-status sensors per destination. The coordinator's
         # backup_status map is populated best-effort; destinations the user
         # hasn't configured (or the token can't see) are simply absent.
@@ -257,6 +272,48 @@ class FeedingVolumeTodaySensor(_ChildSensor):
     def native_value(self):
         snap = self._snapshot
         return round(snap.feeding_volume_today, 1) if snap else 0
+
+
+class MilkStockSensor(_ChildSensor):
+    """Estimated stored breast milk: pumped, minus expressed-milk bottles,
+    minus what was poured away, over the whole history.
+
+    MEASUREMENT rather than TOTAL_INCREASING — a stash goes down as well as up,
+    and a decrease must not read as a counter reset.
+    """
+
+    _attr_translation_key = SENSOR_MILK_STOCK
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, child_id):
+        super().__init__(coordinator, child_id, SENSOR_MILK_STOCK)
+        self._attr_name = "Milk stock"
+        self._attr_native_unit_of_measurement = (
+            UnitOfVolume.FLUID_OUNCES if self._imperial else UnitOfVolume.MILLILITERS
+        )
+
+    @property
+    def native_value(self):
+        snap = self._snapshot
+        if not snap or snap.milk_stock is None:
+            return None
+        value = snap.milk_stock.get("stock")
+        # Negative is meaningful, not an error: it means something isn't being
+        # logged (nursing recorded as a bottle, pumping without amounts), so
+        # pass it through rather than clamping it to zero.
+        return round(float(value), 1) if isinstance(value, (int, float)) else None
+
+    @property
+    def extra_state_attributes(self):
+        snap = self._snapshot
+        if not snap or snap.milk_stock is None:
+            return None
+        stock = snap.milk_stock
+        return {
+            "pumped": stock.get("pumped"),
+            "bottle_fed": stock.get("bottle_fed"),
+            "discarded": stock.get("discarded"),
+        }
 
 
 class SleepHoursTodaySensor(_ChildSensor):

@@ -216,6 +216,35 @@ log_pumping:
       name: Notes
       selector: { text: { multiline: true } }
 
+log_milk_waste:
+  name: Log uneaten milk
+  description: >-
+    Record expressed milk that was prepared but poured away. It is not a
+    feeding — it never counts as intake — but it does leave the stash, so the
+    milk stock subtracts it. Requires BabyTracker 1.10.0 or newer.
+  fields:
+    device_id:
+      name: Child
+      required: true
+      selector:
+        device:
+          integration: babytracker
+          model: Child
+    amount:
+      name: Amount
+      description: How much was poured away, in mL.
+      required: true
+      example: 30
+      selector:
+        number: { mode: box, min: 1, max: 500, step: 1, unit_of_measurement: "mL" }
+    when:
+      name: When
+      description: When it was poured away. Defaults to now if omitted.
+      selector: { datetime: {} }
+    notes:
+      name: Notes
+      selector: { text: { multiline: true } }
+
 log_temperature:
   name: Log temperature
   description: Record a temperature reading.

@@ -28,7 +28,7 @@ from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.util import dt as dt_util
 
 from .api import BabyTrackerError
-from .const import DOMAIN, SERVICE_CREATE_BACKUP
+from .const import DOMAIN, SERVICE_CREATE_BACKUP, SERVICE_LOG_MILK_WASTE
 from .coordinator import BabyTrackerCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,6 +39,7 @@ SERVICE_LOG_SLEEP = "log_sleep"
 SERVICE_LOG_DIAPER = "log_diaper"
 SERVICE_LOG_TUMMY_TIME = "log_tummy_time"
 SERVICE_LOG_PUMPING = "log_pumping"
+# SERVICE_LOG_MILK_WASTE lives in const.py alongside the other cross-module names.
 SERVICE_LOG_TEMPERATURE = "log_temperature"
 SERVICE_LOG_MEDICATION = "log_medication"
 SERVICE_LOG_NOTE = "log_note"
@@ -267,6 +268,20 @@ SCHEMA_LOG_PUMPING = _base_schema({
     vol.Optional("ended_at"): cv.datetime,
 })
 
+# Milk that was prepared but poured away. Amount is required and must be
+# positive — the backend rejects anything else, since a zero or negative
+# discard would silently corrupt the stock balance rather than just leaving a
+# field blank.
+# Built explicitly rather than from _base_schema: that adds a `tags` field,
+# and milk_waste carries no tags on the backend, so the form would offer one
+# that silently does nothing.
+SCHEMA_LOG_MILK_WASTE = vol.Schema({
+    vol.Required("device_id"): cv.string,
+    vol.Optional("notes", default=""): cv.string,
+    vol.Required("amount"): vol.All(vol.Coerce(float), vol.Range(min=0.1)),
+    vol.Optional("when"): cv.datetime,
+})
+
 SCHEMA_LOG_TEMPERATURE = _base_schema({
     vol.Required("temperature"): vol.Coerce(float),
     vol.Optional("when"): cv.datetime,
@@ -458,6 +473,20 @@ async def _log_pumping(call: ServiceCall) -> None:
     await _do_create(call, "create_pumping", payload, entity_type="pumping")
 
 
+async def _log_milk_waste(call: ServiceCall) -> None:
+    cid = _resolve_child_id(call.hass, call.data["device_id"])
+    when = call.data.get("when") or dt_util.now()
+    payload = {
+        "child": cid,
+        "time": _local_iso(when),
+        "amount": call.data["amount"],
+        "notes": call.data.get("notes", ""),
+    }
+    # entity_type is None: milk_waste deliberately carries no tags on the
+    # backend, so there is nothing to attach them to.
+    await _do_create(call, "create_milk_waste", payload)
+
+
 async def _log_temperature(call: ServiceCall) -> None:
     cid = _resolve_child_id(call.hass, call.data["device_id"])
     when = call.data.get("when") or dt_util.now()
@@ -641,6 +670,7 @@ _SERVICES = (
     (SERVICE_LOG_DIAPER, _log_diaper, SCHEMA_LOG_DIAPER),
     (SERVICE_LOG_TUMMY_TIME, _log_tummy_time, SCHEMA_LOG_TUMMY_TIME),
     (SERVICE_LOG_PUMPING, _log_pumping, SCHEMA_LOG_PUMPING),
+    (SERVICE_LOG_MILK_WASTE, _log_milk_waste, SCHEMA_LOG_MILK_WASTE),
     (SERVICE_LOG_TEMPERATURE, _log_temperature, SCHEMA_LOG_TEMPERATURE),
     (SERVICE_LOG_MEDICATION, _log_medication, SCHEMA_LOG_MEDICATION),
     (SERVICE_LOG_NOTE, _log_note, SCHEMA_LOG_NOTE),

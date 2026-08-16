@@ -61,6 +61,9 @@
       "feeding_volume_today": {
         "name": "Feeding volume today"
       },
+      "milk_stock": {
+        "name": "Milk stock"
+      },
       "sleep_hours_today": {
         "name": "Sleep today"
       },
@@ -261,6 +264,26 @@
         "tags": {
           "name": "Tags",
           "description": "Comma-separated list of tag names. New tags are created automatically; rename or recolor them in BabyTracker → Settings → Data → Tags."
+        },
+        "notes": {
+          "name": "Notes"
+        }
+      }
+    },
+    "log_milk_waste": {
+      "name": "Log uneaten milk",
+      "description": "Record expressed milk that was prepared but poured away. It is not a feeding — it never counts as intake — but it does leave the stash, so the milk stock subtracts it. Requires BabyTracker 1.10.0 or newer.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "How much was poured away, in mL."
+        },
+        "when": {
+          "name": "When",
+          "description": "When it was poured away. Defaults to now if omitted."
         },
         "notes": {
           "name": "Notes"
