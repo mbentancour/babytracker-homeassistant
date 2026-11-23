@@ -63,7 +63,13 @@ class ActiveTimerBinarySensor(CoordinatorEntity[BabyTrackerCoordinator], BinaryS
         if not snap or not snap.active_timer:
             return None
         t = snap.active_timer
-        return {"name": t.get("name"), "start": t.get("start")}
+        # Still "on" while paused — the timer exists; is_paused says whether
+        # its clock is running (always False before BabyTracker 1.11).
+        return {
+            "name": t.get("name"),
+            "start": t.get("start"),
+            "is_paused": bool(t.get("is_paused")),
+        }
 
     @property
     def device_info(self) -> DeviceInfo:

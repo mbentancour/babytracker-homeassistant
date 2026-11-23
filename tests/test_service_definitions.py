@@ -114,3 +114,23 @@ def test_milk_waste_webhook_event_is_mapped():
     webhook_py = (_COMPONENT / "webhook.py").read_text()
     assert '"milk_waste.created"' in webhook_py
     assert "EVENT_NEW_MILK_WASTE" in _CONST_PY
+
+
+def test_timer_pause_webhook_events_are_mapped():
+    """BabyTracker 1.11 fires timer.paused / timer.resumed; unmapped, they are
+    acknowledged and dropped, and automations can't react to a pause."""
+    webhook_py = (_COMPONENT / "webhook.py").read_text()
+    assert '"timer.paused": EVENT_TIMER_PAUSED' in webhook_py
+    assert '"timer.resumed": EVENT_TIMER_RESUMED' in webhook_py
+    assert "EVENT_TIMER_PAUSED" in _CONST_PY
+    assert "EVENT_TIMER_RESUMED" in _CONST_PY
+
+
+def test_log_sleep_nap_has_no_fixed_default():
+    """A default of True filed every night logged without the flag as a nap.
+    Left out, the handler decides from the time of day - which only works if
+    neither the schema nor the form fills the field in first."""
+    assert 'vol.Optional("nap"): cv.boolean' in _SERVICES_PY
+    nap = _SERVICES_YAML["log_sleep"]["fields"]["nap"]
+    assert "default" not in nap
+    assert not nap.get("required")

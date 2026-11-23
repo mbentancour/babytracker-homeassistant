@@ -27,6 +27,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.util import dt as dt_util
 
+from . import timeutil
 from .api import BabyTrackerError
 from .const import DOMAIN, SERVICE_CREATE_BACKUP, SERVICE_LOG_MILK_WASTE
 from .coordinator import BabyTrackerCoordinator
@@ -49,6 +50,8 @@ SERVICE_LOG_HEIGHT = "log_height"
 SERVICE_LOG_HEAD_CIRCUMFERENCE = "log_head_circumference"
 SERVICE_START_TIMER = "start_timer"
 SERVICE_STOP_TIMER = "stop_timer"
+SERVICE_PAUSE_TIMER = "pause_timer"
+SERVICE_RESUME_TIMER = "resume_timer"
 SERVICE_SET_SLIDESHOW = "set_slideshow"
 SERVICE_REFRESH = "refresh"
 
@@ -235,7 +238,8 @@ SCHEMA_LOG_SLEEP = _base_schema({
     vol.Required("duration_minutes"): vol.All(
         vol.Coerce(int), vol.Range(min=1, max=24 * 60)
     ),
-    vol.Optional("nap", default=True): cv.boolean,
+    # No default: left out, the handler decides from the time of day.
+    vol.Optional("nap"): cv.boolean,
     vol.Optional("ended_at"): cv.datetime,
 })
 
@@ -333,6 +337,9 @@ SCHEMA_STOP_TIMER = vol.Schema({
     vol.Optional("name"): cv.string,
 })
 
+SCHEMA_PAUSE_TIMER = SCHEMA_STOP_TIMER
+SCHEMA_RESUME_TIMER = SCHEMA_STOP_TIMER
+
 SCHEMA_SET_SLIDESHOW = vol.Schema({
     vol.Required("enabled"): cv.boolean,
     vol.Optional("device"): cv.string,
@@ -425,7 +432,18 @@ async def _log_feeding(call: ServiceCall) -> None:
 async def _log_sleep(call: ServiceCall) -> None:
     cid = _resolve_child_id(call.hass, call.data["device_id"])
     payload = _build_duration_payload(call, cid)
-    payload["nap"] = call.data.get("nap", True)
+    if "nap" in call.data:
+        payload["nap"] = call.data["nap"]
+    else:
+        # Not told which it was. Sending a fixed True (the old behaviour)
+        # filed every night logged from an automation as a nap; judge by
+        # when it started, in HA's timezone, and how long it lasted.
+        minutes = call.data["duration_minutes"]
+        end = call.data.get("ended_at") or dt_util.now()
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+        local_start = dt_util.as_local(end - timedelta(minutes=minutes))
+        payload["nap"] = timeutil.is_nap(local_start, minutes)
     payload["notes"] = call.data.get("notes", "")
     await _do_create(call, "create_sleep", payload, entity_type="sleep")
 
@@ -617,6 +635,62 @@ async def _stop_timer(call: ServiceCall) -> None:
     await coord.async_request_refresh()
 
 
+async def _set_timers_paused(call: ServiceCall, paused: bool) -> None:
+    """Pause or resume this child's timers (all of them, or just ``name``).
+
+    Timers already in the wanted state are left alone rather than sent to the
+    server, which would answer 409/404 for them. If nothing is left to act on
+    the call fails with a message saying why, so an automation's trace shows
+    it instead of a silent no-op.
+    """
+    verb = "pause" if paused else "resume"
+    cid = _resolve_child_id(call.hass, call.data["device_id"])
+    coord = _coordinator(call.hass)
+    name_filter = call.data.get("name", "").strip().lower() or None
+
+    try:
+        timers = await coord.client.list_timers()
+    except BabyTrackerError as err:
+        raise HomeAssistantError(f"Failed to list timers: {err}") from err
+
+    matching = [
+        t for t in timers
+        if t.get("child") == cid
+        and (name_filter is None or (t.get("name", "").lower() == name_filter))
+    ]
+    if not matching:
+        raise ServiceValidationError(
+            "No matching timer is running for this child."
+        )
+    todo = [t for t in matching if bool(t.get("is_paused")) != paused]
+    if not todo:
+        raise ServiceValidationError(
+            "The timer is already paused." if paused else "The timer is not paused."
+        )
+
+    fn = coord.client.pause_timer if paused else coord.client.resume_timer
+    for t in todo:
+        try:
+            await fn(t["id"])
+        except BabyTrackerError as err:
+            # A 404 here on a timer we just listed usually means the server
+            # predates pause support (BabyTracker 1.11.0).
+            raise HomeAssistantError(
+                f"Failed to {verb} timer {t['id']}: {err} "
+                "(pausing timers needs BabyTracker 1.11.0 or newer)"
+            ) from err
+
+    await coord.async_request_refresh()
+
+
+async def _pause_timer(call: ServiceCall) -> None:
+    await _set_timers_paused(call, True)
+
+
+async def _resume_timer(call: ServiceCall) -> None:
+    await _set_timers_paused(call, False)
+
+
 async def _set_slideshow(call: ServiceCall) -> None:
     coord = _coordinator(call.hass)
     payload = {"picture_frame": call.data["enabled"]}
@@ -680,6 +754,8 @@ _SERVICES = (
     (SERVICE_LOG_HEAD_CIRCUMFERENCE, _log_head_circumference, SCHEMA_LOG_HEAD_CIRCUMFERENCE),
     (SERVICE_START_TIMER, _start_timer, SCHEMA_START_TIMER),
     (SERVICE_STOP_TIMER, _stop_timer, SCHEMA_STOP_TIMER),
+    (SERVICE_PAUSE_TIMER, _pause_timer, SCHEMA_PAUSE_TIMER),
+    (SERVICE_RESUME_TIMER, _resume_timer, SCHEMA_RESUME_TIMER),
     (SERVICE_SET_SLIDESHOW, _set_slideshow, SCHEMA_SET_SLIDESHOW),
     (SERVICE_REFRESH, _refresh, SCHEMA_REFRESH),
     (SERVICE_CREATE_BACKUP, _create_backup, SCHEMA_CREATE_BACKUP),

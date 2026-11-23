@@ -38,6 +38,8 @@ from .const import (
     EVENT_NEW_MILK_WASTE,
     EVENT_NEW_SLEEP,
     EVENT_NEW_TEMPERATURE,
+    EVENT_TIMER_PAUSED,
+    EVENT_TIMER_RESUMED,
     EVENT_TIMER_STARTED,
     EVENT_TIMER_STOPPED,
 )
@@ -65,6 +67,8 @@ _EVENT_MAP = {
     "milk_waste.created": EVENT_NEW_MILK_WASTE,
     "timer.started": EVENT_TIMER_STARTED,
     "timer.stopped": EVENT_TIMER_STOPPED,
+    "timer.paused": EVENT_TIMER_PAUSED,
+    "timer.resumed": EVENT_TIMER_RESUMED,
 }
 
 

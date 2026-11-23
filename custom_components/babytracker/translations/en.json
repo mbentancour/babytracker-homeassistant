@@ -173,7 +173,7 @@
         },
         "nap": {
           "name": "Nap",
-          "description": "Daytime nap (otherwise nighttime sleep)."
+          "description": "On for a daytime nap, off for night sleep. Leave unset to decide automatically - a sleep that starts between 07:00 and 19:00 and lasts under four hours counts as a nap."
         },
         "ended_at": {
           "name": "Ended at",
@@ -483,6 +483,32 @@
         "name": {
           "name": "Timer name",
           "description": "Optional. Stops only timers with this exact name (case-insensitive)."
+        }
+      }
+    },
+    "pause_timer": {
+      "name": "Pause timer",
+      "description": "Pause a running timer for a child. Paused time is left out of the entry saved from the timer. If no name is given, all of this child's running timers are paused. Needs BabyTracker 1.11.0 or newer.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "name": {
+          "name": "Timer name",
+          "description": "Optional. Pauses only timers with this exact name (case-insensitive)."
+        }
+      }
+    },
+    "resume_timer": {
+      "name": "Resume timer",
+      "description": "Resume a paused timer for a child. If no name is given, all of this child's paused timers are resumed. Needs BabyTracker 1.11.0 or newer.",
+      "fields": {
+        "device_id": {
+          "name": "Child"
+        },
+        "name": {
+          "name": "Timer name",
+          "description": "Optional. Resumes only timers with this exact name (case-insensitive)."
         }
       }
     },

@@ -253,5 +253,13 @@ class BabyTrackerClient:
     async def delete_timer(self, timer_id: int) -> None:
         await self._request("DELETE", f"/api/timers/{timer_id}/")
 
+    # Pause/resume — added in BabyTracker 1.11.0. On older servers these 404;
+    # pausing an already-paused timer is a 409, resuming a running one a 404.
+    async def pause_timer(self, timer_id: int) -> dict:
+        return await self._request("POST", f"/api/timers/{timer_id}/pause/")
+
+    async def resume_timer(self, timer_id: int) -> dict:
+        return await self._request("POST", f"/api/timers/{timer_id}/resume/")
+
     async def set_display(self, payload: dict) -> dict:
         return await self._request("PUT", "/api/display", json=payload)
