@@ -46,6 +46,7 @@ from .const import (
 
 if TYPE_CHECKING:
     from .coordinator import BabyTrackerCoordinator
+    from .ledger import EventLedger
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -167,6 +168,19 @@ async def async_unregister_webhook(
             _LOGGER.debug("BabyTracker webhook delete failed (may already be gone): %s", err)
 
 
+def _claim(ledger: "EventLedger", event_name: str, data: dict) -> bool:
+    """True if an HA event should be fired for this webhook event."""
+    if event_name == "timer.started":
+        return ledger.claim_timer_started(data)
+    if event_name == "timer.stopped":
+        return ledger.claim_timer_stopped(data)
+    if event_name in ("timer.paused", "timer.resumed"):
+        return ledger.claim_timer_pause_change(data)
+    # "<kind>.created" — the kinds match the coordinator's poll.
+    kind = event_name.split(".", 1)[0]
+    return ledger.claim_entry(data.get("child"), kind, data.get("id"))
+
+
 def _make_handler(coordinator: "BabyTrackerCoordinator", secret: str):
     """Return an HA webhook handler bound to this coordinator + secret."""
 
@@ -188,7 +202,10 @@ def _make_handler(coordinator: "BabyTrackerCoordinator", secret: str):
         data = payload.get("data") or {}
 
         ha_event = _EVENT_MAP.get(event_name)
-        if ha_event is not None:
+        # The ledger says whether this was already announced — by the poll, or
+        # by an earlier delivery of the same webhook — and records it so the
+        # refresh below doesn't announce it a second time.
+        if ha_event is not None and _claim(coordinator.ledger, event_name, data):
             child_id = data.get("child")
             child = next(
                 (c for c in coordinator.data.children if c.get("id") == child_id),

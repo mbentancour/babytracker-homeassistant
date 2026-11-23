@@ -13,6 +13,7 @@ from homeassistant.util import dt as dt_util
 
 from . import timeutil
 from .api import AuthError, BabyTrackerClient, BabyTrackerError
+from .ledger import EventLedger
 from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -108,12 +109,10 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         # imperial household's readings get labelled kg/cm/mL/°C in HA.
         self.unit_system: str = "metric"
         self._unit_system_loaded = False
-        # Track previously-seen entry IDs per (child, kind) so we can emit
-        # events only for newly-created entries (not on first refresh).
-        self._seen: dict[tuple[int, str], set[int]] = {}
-        self._seen_timers: set[int] = set()
-        # Paused state per timer at the last refresh, to spot pause/resume.
-        self._timer_paused: dict[int, bool] = {}
+        # What an event has already been fired for. Shared with the webhook
+        # handler, so an entry it announced isn't announced again by the
+        # refresh it triggers (and the other way round).
+        self.ledger = EventLedger()
         self._first_refresh_done = False
 
     async def _milk_stock(self, cid: int) -> dict | None:
@@ -242,9 +241,9 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 snap.active_timer = next((t for t in timers if t.get("child") == cid), None)
                 snapshots[cid] = snap
 
-                # Fire HA events for newly-seen entries (skip on the first ever refresh
-                # so we don't dump every historical entry as an event on integration
-                # startup).
+                # Fire HA events for newly-seen entries. The first list seen
+                # for a child is only a baseline, so integration startup (or a
+                # child added later) doesn't dump history as events.
                 self._emit_new_entries(cid, child, "feeding", feedings, EVENT_NEW_FEEDING)
                 self._emit_new_entries(cid, child, "sleep", sleeps, EVENT_NEW_SLEEP)
                 self._emit_new_entries(cid, child, "diaper", changes, EVENT_NEW_DIAPER)
@@ -252,42 +251,29 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 self._emit_new_entries(cid, child, "medication", meds, EVENT_NEW_MEDICATION)
                 self._emit_new_entries(cid, child, "milk_waste", milk_waste, EVENT_NEW_MILK_WASTE)
 
-            # Timer events: detect started (in current set, not previously seen)
-            # and stopped (previously seen, not in current set).
-            current_timer_ids = {t["id"] for t in timers}
-            if self._first_refresh_done:
-                for t in timers:
-                    if t["id"] not in self._seen_timers:
-                        cid = t.get("child")
-                        child = child_by_id.get(cid, {})
-                        self.hass.bus.async_fire(
-                            EVENT_TIMER_STARTED,
-                            {
-                                "child_id": cid,
-                                "child_name": child.get("first_name"),
-                                "timer": t,
-                            },
-                        )
-                    elif bool(t.get("is_paused")) != self._timer_paused.get(t["id"], False):
-                        # A timer we already knew flipped between running and
-                        # paused since the last refresh.
-                        cid = t.get("child")
-                        child = child_by_id.get(cid, {})
-                        self.hass.bus.async_fire(
-                            EVENT_TIMER_PAUSED if t.get("is_paused") else EVENT_TIMER_RESUMED,
-                            {
-                                "child_id": cid,
-                                "child_name": child.get("first_name"),
-                                "timer": t,
-                            },
-                        )
-                for tid in self._seen_timers - current_timer_ids:
-                    self.hass.bus.async_fire(
-                        EVENT_TIMER_STOPPED,
-                        {"timer_id": tid},
-                    )
-            self._seen_timers = current_timer_ids
-            self._timer_paused = {t["id"]: bool(t.get("is_paused")) for t in timers}
+            # Timer events the webhook has not already announced. The first
+            # refresh is the ledger's baseline and reports nothing.
+            changes = self.ledger.poll_timers(timers)
+            for t, event_name in (
+                *((t, EVENT_TIMER_STARTED) for t in changes["started"]),
+                *((t, EVENT_TIMER_PAUSED) for t in changes["paused"]),
+                *((t, EVENT_TIMER_RESUMED) for t in changes["resumed"]),
+            ):
+                cid = t.get("child")
+                child = child_by_id.get(cid, {})
+                self.hass.bus.async_fire(
+                    event_name,
+                    {
+                        "child_id": cid,
+                        "child_name": child.get("first_name"),
+                        "timer": t,
+                    },
+                )
+            for tid in changes["stopped"]:
+                self.hass.bus.async_fire(
+                    EVENT_TIMER_STOPPED,
+                    {"timer_id": tid},
+                )
             self._first_refresh_done = True
 
             backup_status = await self._collect_backup_status()
@@ -355,22 +341,19 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         items: list[dict],
         event_name: str,
     ) -> None:
-        """Fire an HA event for each new entry since the last poll."""
-        key = (child_id, kind)
-        current_ids = {it["id"] for it in items if "id" in it}
-        previous = self._seen.get(key, set())
-
-        if self._first_refresh_done:
-            for item in items:
-                iid = item.get("id")
-                if iid is None or iid in previous:
-                    continue
-                self.hass.bus.async_fire(
-                    event_name,
-                    {
-                        "child_id": child_id,
-                        "child_name": child.get("first_name"),
-                        "entry": item,
-                    },
-                )
-        self._seen[key] = current_ids
+        """Fire an HA event for each entry that is new since the last poll and
+        that the webhook has not already announced."""
+        new_ids = self.ledger.poll_entries(
+            child_id, kind, [it.get("id") for it in items]
+        )
+        for item in items:
+            if item.get("id") not in new_ids:
+                continue
+            self.hass.bus.async_fire(
+                event_name,
+                {
+                    "child_id": child_id,
+                    "child_name": child.get("first_name"),
+                    "entry": item,
+                },
+            )
