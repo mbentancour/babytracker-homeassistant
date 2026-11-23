@@ -51,7 +51,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Install pytest
-        run: pip install pytest
+      # pyyaml: test_service_definitions.py parses services.yaml.
+      - name: Install test dependencies
+        run: pip install pytest pyyaml
       - name: Run unit tests
         run: pytest tests -q
