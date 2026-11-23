@@ -22,6 +22,8 @@ from .const import (
     EVENT_NEW_MILK_WASTE,
     EVENT_NEW_SLEEP,
     EVENT_NEW_TEMPERATURE,
+    EVENT_TIMER_PAUSED,
+    EVENT_TIMER_RESUMED,
     EVENT_TIMER_STARTED,
     EVENT_TIMER_STOPPED,
 )
@@ -110,6 +112,8 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         # events only for newly-created entries (not on first refresh).
         self._seen: dict[tuple[int, str], set[int]] = {}
         self._seen_timers: set[int] = set()
+        # Paused state per timer at the last refresh, to spot pause/resume.
+        self._timer_paused: dict[int, bool] = {}
         self._first_refresh_done = False
 
     async def _milk_stock(self, cid: int) -> dict | None:
@@ -264,12 +268,26 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                                 "timer": t,
                             },
                         )
+                    elif bool(t.get("is_paused")) != self._timer_paused.get(t["id"], False):
+                        # A timer we already knew flipped between running and
+                        # paused since the last refresh.
+                        cid = t.get("child")
+                        child = child_by_id.get(cid, {})
+                        self.hass.bus.async_fire(
+                            EVENT_TIMER_PAUSED if t.get("is_paused") else EVENT_TIMER_RESUMED,
+                            {
+                                "child_id": cid,
+                                "child_name": child.get("first_name"),
+                                "timer": t,
+                            },
+                        )
                 for tid in self._seen_timers - current_timer_ids:
                     self.hass.bus.async_fire(
                         EVENT_TIMER_STOPPED,
                         {"timer_id": tid},
                     )
             self._seen_timers = current_timer_ids
+            self._timer_paused = {t["id"]: bool(t.get("is_paused")) for t in timers}
             self._first_refresh_done = True
 
             backup_status = await self._collect_backup_status()

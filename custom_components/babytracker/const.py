@@ -25,6 +25,9 @@ EVENT_NEW_MEDICATION = "babytracker_new_medication"
 EVENT_NEW_MILK_WASTE = "babytracker_new_milk_waste"
 EVENT_TIMER_STARTED = "babytracker_timer_started"
 EVENT_TIMER_STOPPED = "babytracker_timer_stopped"
+# Timers can be paused from BabyTracker 1.11.0.
+EVENT_TIMER_PAUSED = "babytracker_timer_paused"
+EVENT_TIMER_RESUMED = "babytracker_timer_resumed"
 
 # Per-child sensor keys
 SENSOR_LAST_FEEDING = "last_feeding"

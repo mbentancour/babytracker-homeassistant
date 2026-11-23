@@ -79,9 +79,7 @@ log_sleep:
         number: { mode: box, min: 1, max: 1440, step: 1, unit_of_measurement: "min" }
     nap:
       name: Nap
-      description: Daytime nap (otherwise nighttime sleep).
-      required: true
-      default: true
+      description: On for a daytime nap, off for night sleep. Leave unset to decide automatically - a sleep that starts between 07:00 and 19:00 and lasts under four hours counts as a nap.
       selector: { boolean: {} }
     ended_at:
       name: Ended at
@@ -506,6 +504,40 @@ stop_timer:
     name:
       name: Timer name
       description: Optional. Stops only timers with this exact name (case-insensitive).
+      example: "Sleep"
+      selector: { text: {} }
+
+pause_timer:
+  name: Pause timer
+  description: Pause a running timer for a child. Paused time is left out of the entry saved from the timer. If no name is given, all of this child's running timers are paused. Needs BabyTracker 1.11.0 or newer.
+  fields:
+    device_id:
+      name: Child
+      required: true
+      selector:
+        device:
+          integration: babytracker
+          model: Child
+    name:
+      name: Timer name
+      description: Optional. Pauses only timers with this exact name (case-insensitive).
+      example: "Sleep"
+      selector: { text: {} }
+
+resume_timer:
+  name: Resume timer
+  description: Resume a paused timer for a child. If no name is given, all of this child's paused timers are resumed. Needs BabyTracker 1.11.0 or newer.
+  fields:
+    device_id:
+      name: Child
+      required: true
+      selector:
+        device:
+          integration: babytracker
+          model: Child
+    name:
+      name: Timer name
+      description: Optional. Resumes only timers with this exact name (case-insensitive).
       example: "Sleep"
       selector: { text: {} }
 

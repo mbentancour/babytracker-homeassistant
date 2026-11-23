@@ -48,6 +48,7 @@ from .const import (
     SENSOR_LATEST_WEIGHT,
     SENSOR_SLEEP_HOURS_TODAY,
 )
+from . import timeutil
 from .coordinator import BabyTrackerCoordinator
 
 
@@ -737,11 +738,9 @@ class ActiveTimerDurationSensor(_ChildSensor):
         snap = self._snapshot
         if not snap or not snap.active_timer:
             return 0
-        start = _parse_iso(snap.active_timer.get("start"))
-        if not start:
-            return 0
-        now = datetime.now(start.tzinfo or timezone.utc)
-        return max(0, int((now - start).total_seconds()))
+        # Excludes paused time, so it matches the clock in the BabyTracker UI
+        # and stands still while the timer is paused.
+        return timeutil.timer_elapsed_seconds(snap.active_timer, datetime.now(timezone.utc))
 
     @property
     def extra_state_attributes(self):
@@ -749,7 +748,11 @@ class ActiveTimerDurationSensor(_ChildSensor):
         if not snap or not snap.active_timer:
             return None
         t = snap.active_timer
-        return {"name": t.get("name"), "start": t.get("start")}
+        return {
+            "name": t.get("name"),
+            "start": t.get("start"),
+            "is_paused": bool(t.get("is_paused")),
+        }
 
 
 # ---------------------------------------------------------------------------

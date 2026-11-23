@@ -32,8 +32,8 @@ following entities:
 | `sensor.<name>_latest_height`                  | cm        | Most recent height entry                   |
 | `sensor.<name>_latest_head_circumference`      | cm        | Most recent head circumference entry       |
 | `sensor.<name>_latest_bmi`                     | kg/m²     | Most recent BMI entry                      |
-| `sensor.<name>_active_timer_duration`          | seconds   | Elapsed time of a running timer (0 while idle) |
-| `binary_sensor.<name>_active_timer`            | on/off    | On while a timer is running for this child |
+| `sensor.<name>_active_timer_duration`          | seconds   | Elapsed time of the active timer, not counting paused time (0 while idle). Attribute `is_paused` |
+| `binary_sensor.<name>_active_timer`            | on/off    | On while a timer exists for this child, paused or not. Attribute `is_paused` |
 
 Per backup destination, a second device is created with:
 
@@ -116,6 +116,8 @@ detected in BabyTracker:
 | `babytracker_new_milk_waste`     | Uneaten milk is logged           | `child_id`, `child_name`, `entry`   |
 | `babytracker_timer_started`      | A timer starts                   | `child_id`, `child_name`, `timer`   |
 | `babytracker_timer_stopped`      | A timer is stopped/deleted       | `timer_id`                          |
+| `babytracker_timer_paused`       | A timer is paused                | `child_id`, `child_name`, `timer`   |
+| `babytracker_timer_resumed`      | A paused timer is resumed        | `child_id`, `child_name`, `timer`   |
 
 `entry` and `timer` carry the full record from the API (id, type, method,
 amount, start/end times, etc.) so you can branch on any of those fields in
@@ -156,8 +158,19 @@ when omitted.
 | ----------------------------- | --------------------------------------------- |
 | `babytracker.start_timer`     | Start a timer for a child                     |
 | `babytracker.stop_timer`      | Stop a timer for a child (by name, optional)  |
+| `babytracker.pause_timer`     | Pause a running timer (by name, optional)     |
+| `babytracker.resume_timer`    | Resume a paused timer (by name, optional)     |
 | `babytracker.set_slideshow`   | Start/stop the picture frame slideshow        |
 | `babytracker.refresh`         | Force-refresh the integration's sensor data   |
+
+Pausing timers needs BabyTracker 1.11.0 or newer. Time spent paused is left
+out of the active-timer duration and of `sleep_hours_today`, matching the
+BabyTracker app.
+
+`babytracker.log_sleep` takes an optional `nap` flag. Leave it out and the
+sleep is classed automatically: one that starts between 07:00 and 19:00 (Home
+Assistant's timezone) and lasts under four hours is a nap, anything else is
+night sleep.
 
 ### Backups
 
